@@ -43,7 +43,12 @@ export default function Register() {
         </View>
 
         <View style={styles.content}>
-          <Text style={styles.title}>Criar Conta</Text>
+          <View style={styles.titleRow}>
+            <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+              <Feather name="arrow-left" size={40} color="#000" />
+            </TouchableOpacity>
+            <Text style={styles.title}>Criar Conta</Text>
+          </View>
 
           <View style={styles.row}>
             <View style={styles.inputHalf}>
@@ -162,13 +167,12 @@ const styles = StyleSheet.create({
   },
   logoRow: {
     flexDirection: 'row',
-    marginTop: 20,
     alignItems: 'center',
     gap: 12,
   },
   logoSmall: {
-    width: 100,
-    height: 100,
+    width: 60,
+    height: 60,
     resizeMode: 'contain',
   },
   logoText: {
@@ -184,11 +188,23 @@ const styles = StyleSheet.create({
     paddingVertical: 40,
     justifyContent: 'center',
   },
+  titleRow: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 30,
+    position: 'relative',
+    height: 40,
+  },
+  backButton: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    paddingHorizontal: 5,
+  },
   title: {
     fontSize: 30,
     fontWeight: 'bold',
     color: '#000',
-    marginBottom: 30,
     textAlign: 'center',
   },
   label: {

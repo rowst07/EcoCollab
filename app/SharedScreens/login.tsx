@@ -78,7 +78,7 @@ export default function Login() {
           </View>
 
           <View style={styles.bottomSection}>
-            <TouchableOpacity style={styles.button}>
+            <TouchableOpacity style={styles.button} onPress={() => router.push('/UserScreens/homeUser')}>
               <Text style={styles.buttonText}>Entrar</Text>
             </TouchableOpacity>
 
