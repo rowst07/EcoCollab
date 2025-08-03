@@ -1,5 +1,4 @@
 import { StyleSheet, Text, View } from 'react-native';
-import BottomNavbar from '../../components/bottomNavbar';
 
 export default function Retomas() {
   return (
@@ -8,8 +7,6 @@ export default function Retomas() {
         <Text style={styles.title}>Bem-vindo ao EcoCollab</Text>
         <Text style={styles.subtitle}>Esta é a tua página inicial.</Text>
       </View>
-
-      <BottomNavbar /> 
     </View>
   );
 }

@@ -37,6 +37,10 @@ export default function BottomNavbar() {
 
 const styles = StyleSheet.create({
   wrapper: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
     justifyContent: 'space-around',
     paddingVertical: 18,
@@ -45,6 +49,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     elevation: 10,
     shadowColor: '#000',
+    zIndex: 999,
   },
   tab: {
     alignItems: 'center',
