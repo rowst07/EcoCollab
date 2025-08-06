@@ -182,7 +182,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 2,
-    backgroundColor: '#fff',
+    backgroundColor: '#EEEDD7',
     borderTopLeftRadius: 50,
     paddingHorizontal: 30,
     paddingVertical: 40,
