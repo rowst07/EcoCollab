@@ -2,14 +2,14 @@ import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useState } from 'react';
 import {
-    Image,
-    Modal,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Image,
+  Modal,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 interface Props {
@@ -40,8 +40,11 @@ export default function NovaRetomaModal({ visible, onClose, onPublicar }: Props)
   };
 
   const publicar = () => {
-    if (!nome) return alert('Preencha o nome do item.');
-    const nova = { nome, tipo, pontos: parseInt(pontos) || 0, descricao, imagem };
+    if (!nome.trim()) {
+      alert('Preencha o nome do item.');
+      return;
+    }
+    const nova = { nome: nome.trim(), tipo, pontos: parseInt(pontos) || 0, descricao: descricao.trim(), imagem };
     onPublicar(nova);
     onClose();
     // Reset
@@ -58,7 +61,6 @@ export default function NovaRetomaModal({ visible, onClose, onPublicar }: Props)
         <View style={styles.modalContainer}>
           {/* Header */}
           <View style={styles.header}>
-            <Image source={require('../../assets/logo.png')} style={styles.logo} />
             <Text style={styles.headerText}>Nova Retoma</Text>
           </View>
 
@@ -79,13 +81,13 @@ export default function NovaRetomaModal({ visible, onClose, onPublicar }: Props)
                 style={[styles.tipoBtn, tipo === 'Doação' && styles.tipoAtivo]}
                 onPress={() => setTipo('Doação')}
               >
-                <Text style={styles.tipoText}>Doação</Text>
+                <Text style={[styles.tipoText, tipo !== 'Doação' && styles.tipoTextInativo]}>Doação</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.tipoBtn, tipo === 'Troca' && styles.tipoAtivo]}
                 onPress={() => setTipo('Troca')}
               >
-                <Text style={styles.tipoText}>Troca</Text>
+                <Text style={[styles.tipoText, tipo !== 'Troca' && styles.tipoTextInativo]}>Troca</Text>
               </TouchableOpacity>
             </View>
 
@@ -101,7 +103,7 @@ export default function NovaRetomaModal({ visible, onClose, onPublicar }: Props)
 
             <Text style={styles.label}>Descrição</Text>
             <TextInput
-              style={[styles.input, { height: 80 }]}
+              style={[styles.input, { height: 100, textAlignVertical: 'top' }]}
               placeholder="Descreva o estado ou mais detalhes..."
               placeholderTextColor="#999"
               value={descricao}
@@ -123,8 +125,8 @@ export default function NovaRetomaModal({ visible, onClose, onPublicar }: Props)
               <Text style={styles.publicarText}>Publicar Retoma</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={onClose}>
-              <Text style={styles.cancelar}>Cancelar</Text>
+            <TouchableOpacity style={styles.cancelarBtn} onPress={onClose}>
+              <Text style={styles.cancelarText}>Cancelar</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -148,15 +150,10 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: '#000',
     paddingVertical: 20,
+    marginBottom: 20,
     alignItems: 'center',
     borderTopLeftRadius: 40,
     borderTopRightRadius: 40,
-  },
-  logo: {
-    width: 100,
-    height: 100,
-    resizeMode: 'contain',
-    marginBottom: 10,
   },
   headerText: {
     fontSize: 24,
@@ -176,7 +173,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#000',
     color: '#fff',
     paddingHorizontal: 16,
-    paddingVertical: Platform.OS === 'ios' ? 14 : 10,
+    paddingVertical: Platform.OS === 'ios' ? 14 : 12,
     borderRadius: 10,
     marginBottom: 16,
   },
@@ -196,13 +193,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#2E7D32',
   },
   tipoText: {
-    color: '#fff',
-    fontWeight: '600',
+    fontWeight: '700',
+    color: '#fff'
+  },
+  tipoTextInativo: {
+    color: '#333',
   },
   uploadBtn: {
-    backgroundColor: '#EA3323',
+    backgroundColor: '#000',
     borderRadius: 10,
     padding: 12,
+    width: '60%',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -215,12 +216,12 @@ const styles = StyleSheet.create({
   },
   imagemPreview: {
     width: '100%',
-    height: 140,
+    height: 160,
     borderRadius: 12,
     marginBottom: 20,
   },
   publicarBtn: {
-    backgroundColor: '#EA3323',
+    backgroundColor: '#2E7D32', // verde
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
@@ -229,12 +230,17 @@ const styles = StyleSheet.create({
   publicarText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
-  cancelar: {
-    textAlign: 'center',
-    color: '#EA3323',
-    textDecorationLine: 'underline',
-    marginTop: 6,
+  cancelarBtn: {
+    backgroundColor: '#D32F2F', // vermelho
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  cancelarText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
   },
 });
