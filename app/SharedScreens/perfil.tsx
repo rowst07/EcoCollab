@@ -60,7 +60,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     paddingTop: 60,
     paddingHorizontal: 20,
-    paddingBottom: 100, // espaço para navbar
+    paddingBottom: 100,
   },
   header: {
     flexDirection: 'row',
