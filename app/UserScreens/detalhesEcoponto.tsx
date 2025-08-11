@@ -107,7 +107,7 @@ export default function DetalhesEcoponto() {
               <Text style={styles.actionBtnText}>Ir para o local</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.reportBtn} onPress={() => console.log('Reportar problema')}>
+            <TouchableOpacity style={styles.reportBtn} onPress={() => router.push('/UserScreens/report')}>
               <Ionicons name="alert-circle" size={20} color="#fff" />
               <Text style={styles.actionBtnText}>Reportar problema</Text>
             </TouchableOpacity>
