@@ -115,7 +115,8 @@ export default function PesquisaModal({
 const styles = StyleSheet.create({
   modalContainer: {
     flex: 1,
-    padding: 20
+    padding: 20,
+    marginTop: 40,
   },
   modalTitle: {
     fontSize: 22,

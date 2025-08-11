@@ -1,5 +1,5 @@
+import BottomNavbar from '@/components/BottomNavbar';
 import { Stack, usePathname } from 'expo-router';
-import BottomNavbar from '../components/bottomNavbar';
 
 export default function Layout() {
   const pathname = usePathname();
@@ -15,7 +15,7 @@ export default function Layout() {
       <Stack
         screenOptions={{
           headerShown: false,
-          gestureEnabled: true, // ✅ ativa swipe para voltar no iPhone
+          gestureEnabled: true,
         }}
       />
       {showNavbar && <BottomNavbar />}
