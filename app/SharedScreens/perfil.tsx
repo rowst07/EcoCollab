@@ -1,7 +1,9 @@
 import { Feather } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function Perfil() {
+  const router = useRouter();
   return (
     <View style={styles.wrapper}>
       {/* Header com título e ícones */}
@@ -12,7 +14,7 @@ export default function Perfil() {
             <Feather name="edit-3" size={24} color="#000" />
           </TouchableOpacity>
           <TouchableOpacity style={styles.iconBtn}>
-            <Feather name="settings" size={24} color="#000" />
+            <Feather name="settings" size={24} color="#000" onPress={() => router.push('/SharedScreens/definicoes')}/>
           </TouchableOpacity>
         </View>
       </View>
