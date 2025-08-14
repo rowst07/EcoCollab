@@ -17,8 +17,7 @@ import {
 } from 'react-native';
 
 import { SimpleSelect } from '@/components/SimpleSelect';
-import { BRAND } from '@/constants/Colors';
-import { useTheme, useThemeColor } from '@/hooks/useThemeColor';
+import { THEME } from '@/constants/Colors';
 
 type Ecoponto = {
   id: number;
@@ -48,13 +47,13 @@ export default function Report() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
 
-  // Tema
-  const t = useTheme();
-  const bg = useThemeColor('bg');
-  const text = useThemeColor('text');
-  const muted = useThemeColor('textMuted');
-  const card = useThemeColor('card');
-  const border = useThemeColor('border');
+  // Tema escuro fixo
+  const colors = THEME.dark;
+  const bg = colors.bg;
+  const text = colors.text;
+  const muted = colors.textMuted;
+  const card = colors.card;
+  const border = colors.border;
 
   const ecoponto = useMemo<Ecoponto>(() => {
     const nId = Number(id);
@@ -126,12 +125,12 @@ export default function Report() {
 
   return (
     <View style={{ flex: 1, backgroundColor: bg }}>
-      {/* Header preto */}
-      <View style={styles.header}>
+      {/* Header dark */}
+      <View style={[styles.header, { backgroundColor: colors.bg, borderColor: colors.border }]}> 
         <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={28} color="#fff" />
+          <Ionicons name="arrow-back" size={28} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Reportar problema</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Reportar problema</Text>
         <View style={{ width: 28 }} />
       </View>
 
@@ -140,7 +139,7 @@ export default function Report() {
         {streetViewUrl ? (
           <Image source={{ uri: streetViewUrl }} style={{ width, height }} resizeMode="cover" />
         ) : (
-          <View style={[styles.placeholder, { width, height, backgroundColor: card, borderColor: border }]}>
+          <View style={[styles.placeholder, { width, height, backgroundColor: card, borderColor: border }]}> 
             <Ionicons name="image" size={32} color={muted} />
             <Text style={{ color: muted, marginTop: 6 }}>Street View não disponível</Text>
           </View>
@@ -170,11 +169,11 @@ export default function Report() {
           />
 
           <TouchableOpacity
-            style={[styles.uploadBtn, { backgroundColor: '#000' }]}
+            style={[styles.uploadBtn, { backgroundColor: colors.card }]}
             onPress={escolherImagem}
           >
-            <Ionicons name="image" size={20} color="#fff" />
-            <Text style={styles.uploadBtnText}>{imagemUri ? 'Alterar imagem' : 'Anexar imagem'}</Text>
+            <Ionicons name="image" size={20} color={colors.text} />
+            <Text style={[styles.uploadBtnText, { color: colors.text }]}>{imagemUri ? 'Alterar imagem' : 'Anexar imagem'}</Text>
           </TouchableOpacity>
 
           {imagemUri && (
@@ -182,12 +181,12 @@ export default function Report() {
           )}
 
           <TouchableOpacity
-            style={[styles.submitBtn, { backgroundColor: BRAND.primary }]}
+            style={[styles.submitBtn, { backgroundColor: colors.primary }]}
             onPress={submeter}
             disabled={aEnviar}
           >
-            <Ionicons name="send" size={20} color="#fff" />
-            <Text style={styles.submitBtnText}>{aEnviar ? 'A enviar...' : 'Submeter'}</Text>
+            <Ionicons name="send" size={20} color={colors.bg} />
+            <Text style={[styles.submitBtnText, { color: colors.bg }]}>{aEnviar ? 'A enviar...' : 'Submeter'}</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -197,7 +196,7 @@ export default function Report() {
 
 const styles = StyleSheet.create({
   header: {
-    backgroundColor: '#000',
+    // backgroundColor e borderColor definidos inline pelo tema
     flexDirection: 'row',
     alignItems: 'center',
     paddingTop: 52,
@@ -205,12 +204,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     justifyContent: 'space-between',
     borderBottomWidth: 1,
-    borderColor: '#111'
   },
   headerTitle: {
-    color: '#fff',
+    // color definido inline pelo tema
     fontSize: 20,
-    fontWeight: '700'
+    fontWeight: '700',
   },
   placeholder: {
     alignItems: 'center',
@@ -296,11 +294,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexDirection: 'row',
     gap: 8,
-    marginBottom: 12
+    marginBottom: 12,
   },
   uploadBtnText: {
-    color: '#fff',
-    fontWeight: '800'
+    // color definido inline pelo tema
+    fontWeight: '800',
   },
   preview: {
     width: '100%',
@@ -314,11 +312,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
-    gap: 10
+    gap: 10,
   },
   submitBtnText: {
-    color: '#fff',
+    // color definido inline pelo tema
     fontWeight: '900',
-    fontSize: 16
-  }
+    fontSize: 16,
+  },
 });

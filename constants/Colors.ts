@@ -28,11 +28,11 @@ export const THEME = {
     overlay:   '#00000099',
     border:    '#EEEEEE',
     hairline:  '#F0F0F0',
-    input:     '#FFFFFF',
+    input:     '#000',
     inputBorder: '#DDDDDD',
 
     text:      '#111111',
-    textInput: '#333333',
+    textInput: '#fff',
     textMuted: '#666666',
     icon:      '#888888',
 
@@ -50,7 +50,7 @@ export const THEME = {
     inputBorder: '#262626',
 
     text:      '#E5E7EB',
-    textInput: '#EEEDD7',
+    textInput: '#000',
     textMuted: '#9CA3AF',
     icon:      '#E5E7EB',
 

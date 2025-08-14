@@ -1,14 +1,9 @@
+
 import { useState } from 'react';
 import { FlatList, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { RESIDUE_COLORS, THEME } from '../../constants/Colors';
 
-const cores = {
-  papel: '#2196F3',
-  plastico: '#FFEB3B',
-  vidro: '#4CAF50',
-  pilhas: '#F44336',
-  organico: '#795548',
-  outros: '#ffffff'
-};
+const colors = THEME.dark;
 
 
 export default function PesquisaModal({
@@ -33,6 +28,7 @@ export default function PesquisaModal({
         <TextInput
           style={styles.input}
           placeholder="Digite um nome..."
+          placeholderTextColor={colors.textMuted}
           value={pesquisa}
           onChangeText={setPesquisa}
         />
@@ -60,7 +56,7 @@ export default function PesquisaModal({
                   { opacity: filtros[tipo] ? 1 : 0.4 }
                 ]}
               >
-                <View style={[styles.circle, { backgroundColor: cores[tipo] }]} />
+                <View style={[styles.circle, { backgroundColor: RESIDUE_COLORS[tipo] || colors.icon }]} />
                 <Text style={styles.tipoText}>{tipo.toUpperCase()}</Text>
               </TouchableOpacity>
             ))}
@@ -77,7 +73,7 @@ export default function PesquisaModal({
                 onPress={() => setFiltros(prev => ({ ...prev, classificacao: c }))}
                 style={[styles.filtroBtn, filtros.classificacao === c && styles.filtroAtivo]}
               >
-                <Text style={{ color: '#fff' }}>{c === 'todos' ? 'Todos' : `>= ${c} estrelas`}</Text>
+                <Text style={{ color: colors.text }}>{c === 'todos' ? 'Todos' : `>= ${c} estrelas`}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -105,7 +101,7 @@ export default function PesquisaModal({
         )}
 
         <TouchableOpacity style={styles.btnFechar} onPress={onClose}>
-          <Text style={{ color: '#fff' }}>Fechar</Text>
+          <Text style={{ color: colors.text }}>Fechar</Text>
         </TouchableOpacity>
       </View>
     </Modal>
@@ -117,29 +113,33 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
     marginTop: 40,
+    backgroundColor: colors.bg,
   },
   modalTitle: {
     fontSize: 22,
     fontWeight: 'bold',
-    marginBottom: 20
+    marginBottom: 20,
+    color: colors.text,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ccc',
+    borderColor: colors.inputBorder,
     borderRadius: 8,
     padding: 10,
-    marginBottom: 10
+    marginBottom: 10,
+    color: colors.textInput,
+    backgroundColor: colors.input,
   },
   btnAplicar: {
-    backgroundColor: '#2E7D32',
+    backgroundColor: colors.primary,
     padding: 12,
     borderRadius: 8,
     alignItems: 'center',
-    marginBottom: 20
+    marginBottom: 20,
   },
   btnAplicarText: {
-    color: '#fff',
-    fontWeight: 'bold'
+    color: THEME.dark.text,
+    fontWeight: 'bold',
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -148,21 +148,22 @@ const styles = StyleSheet.create({
     marginTop: 10,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#ccc'
+    borderBottomColor: colors.border,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '600'
+    fontWeight: '600',
+    color: colors.text,
   },
   sectionIcon: {
     fontSize: 18,
-    color: '#555'
+    color: colors.icon,
   },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginTop: 10
+    marginTop: 10,
   },
   tipoItem: {
     width: '48%',
@@ -171,43 +172,45 @@ const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 10,
     borderRadius: 8,
-    backgroundColor: '#eee'
+    backgroundColor: THEME.dark.input,
   },
   circle: {
     width: 20,
     height: 20,
     borderRadius: 10,
-    marginRight: 10
+    marginRight: 10,
   },
   tipoText: {
     fontWeight: '600',
-    color: '#333'
+    color: colors.textInput,
   },
   subTitle: {
     fontSize: 16,
     fontWeight: '600',
     marginTop: 15,
-    marginBottom: 5
+    marginBottom: 5,
+    color: colors.text,
   },
   filtroBtn: {
-    backgroundColor: '#999',
+    backgroundColor: colors.card,
     padding: 12,
     borderRadius: 8,
-    marginTop: 10
+    marginTop: 10,
   },
   filtroAtivo: {
-    backgroundColor: '#2E7D32'
+    backgroundColor: colors.primary,
   },
   historicoItem: {
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#ccc'
+    borderBottomColor: colors.border,
+    color: colors.text,
   },
   btnFechar: {
-    backgroundColor: '#D32F2F',
+    backgroundColor: colors.danger,
     padding: 12,
     borderRadius: 8,
     alignItems: 'center',
-    marginTop: 30
-  }
+    marginTop: 30,
+  },
 });

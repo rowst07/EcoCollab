@@ -1,20 +1,40 @@
+// app/SharedScreens/Perfil.tsx
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React from 'react';
+import {
+  Image,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  useColorScheme,
+} from 'react-native';
+
+import { BRAND, THEME } from '@/constants/Colors';
 
 export default function Perfil() {
   const router = useRouter();
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
+  const T = THEME[scheme];
+
   return (
-    <View style={styles.wrapper}>
+    <View style={[styles.wrapper, { backgroundColor: T.bg }]}>
       {/* Header com título e ícones */}
       <View style={styles.header}>
-        <Text style={styles.title}>Perfil</Text>
+        <Text style={[styles.title, { color: T.text }]}>Perfil</Text>
         <View style={styles.iconGroup}>
-          <TouchableOpacity style={styles.iconBtn}>
-            <Feather name="edit-3" size={24} color="#000" onPress={() => router.push('/SharedScreens/editarPerfil')}/>
+          <TouchableOpacity
+            style={[styles.iconBtn, { backgroundColor: T.border }]}
+            onPress={() => router.push('/SharedScreens/editarPerfil')}
+          >
+            <Feather name="edit-3" size={22} color={T.text} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.iconBtn}>
-            <Feather name="settings" size={24} color="#000" onPress={() => router.push('/SharedScreens/definicoes')}/>
+          <TouchableOpacity
+            style={[styles.iconBtn, { backgroundColor: T.border }]}
+            onPress={() => router.push('/SharedScreens/definicoes')}
+          >
+            <Feather name="settings" size={22} color={T.text} />
           </TouchableOpacity>
         </View>
       </View>
@@ -23,43 +43,51 @@ export default function Perfil() {
       <View style={styles.profileSection}>
         <Image
           source={require('../../assets/placeholder.png')}
-          style={styles.avatar}
+          style={[styles.avatar, { backgroundColor: T.card }]}
         />
         <View style={styles.userInfo}>
-          <Text style={styles.name}>João Moutinho</Text>
-          <Text style={styles.role}>Utilizador</Text>
+          <Text style={[styles.name, { color: T.text }]}>João Moutinho</Text>
+          <Text style={[styles.role, { color: T.textMuted }]}>Utilizador</Text>
         </View>
       </View>
 
       {/* Estatísticas */}
       <View style={styles.statsSection}>
-        <View style={styles.statBox}>
-          <Text style={styles.statNumber}>38</Text>
-          <Text style={styles.statLabel}>Retomas</Text>
+        <View style={[styles.statBox, { backgroundColor: T.card, borderColor: T.border }]}>
+          <Text style={[styles.statNumber, { color: BRAND.primary }]}>38</Text>
+          <Text style={[styles.statLabel, { color: T.text }]}>{'Retomas'}</Text>
         </View>
-        <View style={styles.statBox}>
-          <Text style={styles.statNumber}>1240</Text>
-          <Text style={styles.statLabel}>Pontos</Text>
+        <View style={[styles.statBox, { backgroundColor: T.card, borderColor: T.border }]}>
+          <Text style={[styles.statNumber, { color: BRAND.primary }]}>1240</Text>
+          <Text style={[styles.statLabel, { color: T.text }]}>{'Pontos'}</Text>
         </View>
       </View>
 
       {/* Histórico */}
       <View style={styles.historySection}>
-        <Text style={styles.historyTitle}>Histórico</Text>
-        <TouchableOpacity style={styles.historyItem}>
-          <Text style={styles.historyText}>Histórico de Recompensas</Text>
+        <Text style={[styles.historyTitle, { color: T.text }]}>Histórico</Text>
+
+        <TouchableOpacity
+          style={[styles.historyItem, { backgroundColor: T.card, borderColor: T.border }]}
+        >
+          <Text style={[styles.historyText, { color: T.text }]}>Histórico de Recompensas</Text>
+          <Feather name="chevron-right" size={18} color={T.icon} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.historyItem}>
-          <Text style={styles.historyText}>Histórico de Reciclagem</Text>
+
+        <TouchableOpacity
+          style={[styles.historyItem, { backgroundColor: T.card, borderColor: T.border }]}
+        >
+          <Text style={[styles.historyText, { color: T.text }]}>Histórico de Reciclagem</Text>
+          <Feather name="chevron-right" size={18} color={T.icon} />
         </TouchableOpacity>
       </View>
     </View>
   );
 }
+
 const styles = StyleSheet.create({
   wrapper: {
     flex: 1,
-    backgroundColor: '#fff',
     paddingTop: 60,
     paddingHorizontal: 20,
     paddingBottom: 100,
@@ -74,7 +102,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 26,
     fontWeight: 'bold',
-    color: '#000',
   },
   iconGroup: {
     position: 'absolute',
@@ -82,8 +109,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   iconBtn: {
-    marginLeft: 15,
+    marginLeft: 12,
+    padding: 8,
+    borderRadius: 12,
   },
+
   profileSection: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -101,51 +131,52 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 24,
     fontWeight: '600',
-    color: '#000',
   },
   role: {
-    fontSize: 18,
-    color: '#666',
+    fontSize: 16,
   },
+
   statsSection: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     marginBottom: 30,
   },
   statBox: {
+    flex: 1,
+    marginHorizontal: 6,
     alignItems: 'center',
-    backgroundColor: '#000',
-    paddingVertical: 20,
-    paddingHorizontal: 30,
-    borderRadius: 20,
+    paddingVertical: 18,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   statNumber: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#2E7D32',
   },
   statLabel: {
     fontSize: 14,
-    color: '#fff',
-    marginTop: 5,
+    marginTop: 6,
   },
+
   historySection: {
     marginTop: 10,
+    gap: 12,
   },
   historyTitle: {
     fontSize: 22,
     fontWeight: '600',
-    marginBottom: 16,
+    marginBottom: 4,
   },
   historyItem: {
-    backgroundColor: '#f1f1f1',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingVertical: 14,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     borderRadius: 12,
-    marginBottom: 12,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   historyText: {
     fontSize: 16,
-    color: '#333',
   },
 });
