@@ -11,7 +11,7 @@ export default function Perfil() {
         <Text style={styles.title}>Perfil</Text>
         <View style={styles.iconGroup}>
           <TouchableOpacity style={styles.iconBtn}>
-            <Feather name="edit-3" size={24} color="#000" />
+            <Feather name="edit-3" size={24} color="#000" onPress={() => router.push('/SharedScreens/editarPerfil')}/>
           </TouchableOpacity>
           <TouchableOpacity style={styles.iconBtn}>
             <Feather name="settings" size={24} color="#000" onPress={() => router.push('/SharedScreens/definicoes')}/>

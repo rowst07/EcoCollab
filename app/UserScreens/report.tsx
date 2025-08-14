@@ -1,9 +1,24 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Linking, Platform, Dimensions, TextInput, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useMemo, useState } from 'react';
-import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useMemo, useState } from 'react';
+import {
+  Alert,
+  Dimensions,
+  Image,
+  Linking,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
+} from 'react-native';
+
+import { SimpleSelect } from '@/components/SimpleSelect';
+import { BRAND } from '@/constants/Colors';
+import { useTheme, useThemeColor } from '@/hooks/useThemeColor';
 
 type Ecoponto = {
   id: number;
@@ -29,11 +44,19 @@ const PROBLEMAS = [
   { value: 'outro', label: 'Outro' }
 ];
 
-export default function ReportarProblema() {
+export default function Report() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
 
-  const ecoponto: Ecoponto = useMemo(() => {
+  // Tema
+  const t = useTheme();
+  const bg = useThemeColor('bg');
+  const text = useThemeColor('text');
+  const muted = useThemeColor('textMuted');
+  const card = useThemeColor('card');
+  const border = useThemeColor('border');
+
+  const ecoponto = useMemo<Ecoponto>(() => {
     const nId = Number(id);
     return MOCK.find((e) => e.id === nId) ?? MOCK[0];
   }, [id]);
@@ -46,8 +69,9 @@ export default function ReportarProblema() {
     ? `https://maps.googleapis.com/maps/api/streetview?size=${Math.min(width, 1200)}x${Math.min(height, 800)}&location=${ecoponto.latitude},${ecoponto.longitude}&fov=80&pitch=0&key=${API_KEY}`
     : null;
 
-  const [tipoProblema, setTipoProblema] = useState<string>('cheio');
-  const [descricao, setDescricao] = useState<string>('');
+  // Form state
+  const [tipoProblema, setTipoProblema] = useState('cheio');
+  const [descricao, setDescricao] = useState('');
   const [imagemUri, setImagemUri] = useState<string | null>(null);
   const [aEnviar, setAEnviar] = useState(false);
 
@@ -57,7 +81,6 @@ export default function ReportarProblema() {
       Alert.alert('Permissão necessária', 'Autoriza o acesso à galeria para anexar imagens.');
       return;
     }
-
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.7
@@ -67,12 +90,21 @@ export default function ReportarProblema() {
     }
   };
 
+  const abrirNavegacao = () => {
+    const { latitude: lat, longitude: lng, nome } = ecoponto;
+    const label = encodeURIComponent(nome);
+    if (Platform.OS === 'ios') {
+      Linking.openURL(`http://maps.apple.com/?daddr=${lat},${lng}&q=${label}`);
+    } else {
+      Linking.openURL(`geo:${lat},${lng}?q=${lat},${lng}(${label})`);
+    }
+  };
+
   const submeter = async () => {
     if (!tipoProblema) return Alert.alert('Validação', 'Escolhe um tipo de problema.');
     if (!descricao || descricao.trim().length < 5) {
       return Alert.alert('Validação', 'Escreve uma descrição mais detalhada (≥ 5 caracteres).');
     }
-
     try {
       setAEnviar(true);
       const payload = {
@@ -81,9 +113,8 @@ export default function ReportarProblema() {
         descricao: descricao.trim(),
         imagemUri
       };
-      // TODO: chamar a tua API aqui (fetch/axios)
-      console.log('REPORTAR_PROBLEMA_PAYLOAD', payload);
-
+      // TODO: ligar à tua API (multipart/form-data se precisares da imagem)
+      console.log('REPORT_PAYLOAD', payload);
       Alert.alert('Obrigado!', 'O teu reporte foi enviado com sucesso.');
       router.back();
     } catch (e) {
@@ -94,7 +125,7 @@ export default function ReportarProblema() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#fff' }}>
+    <View style={{ flex: 1, backgroundColor: bg }}>
       {/* Header preto */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
@@ -104,60 +135,57 @@ export default function ReportarProblema() {
         <View style={{ width: 28 }} />
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
-        {/* Street View full width (opcional) */}
+      <ScrollView contentContainerStyle={{ paddingBottom: 28 }}>
+        {/* Street View */}
         {streetViewUrl ? (
           <Image source={{ uri: streetViewUrl }} style={{ width, height }} resizeMode="cover" />
         ) : (
-          <View style={[styles.placeholder, { width, height }]}>
-            <Ionicons name="image" size={32} color="#aaa" />
-            <Text style={{ color: '#aaa', marginTop: 6 }}>Street View não disponível</Text>
+          <View style={[styles.placeholder, { width, height, backgroundColor: card, borderColor: border }]}>
+            <Ionicons name="image" size={32} color={muted} />
+            <Text style={{ color: muted, marginTop: 6 }}>Street View não disponível</Text>
           </View>
         )}
 
         {/* Conteúdo */}
         <View style={styles.content}>
-          {/* Título/identificação do ecoponto */}
-          <Text style={styles.nome}>{ecoponto.nome}</Text>
-          <Text style={styles.morada}>{ecoponto.morada}</Text>
+          {/* Identificação */}
+          <Text style={[styles.nome, { color: text }]}>{ecoponto.nome}</Text>
+          <Text style={[styles.morada, { color: muted }]}>{ecoponto.morada}</Text>
+  
+          {/* Formulário */}
+          <Text style={[styles.subTitle, { color: text }]}>Tipo de problema</Text>
+          <SimpleSelect value={tipoProblema} onChange={setTipoProblema} options={PROBLEMAS} />
 
-          {/* Dropdown tipo de problema */}
-          <Text style={styles.subTitle}>Tipo de problema</Text>
-          <View style={styles.pickerWrap}>
-            <Picker
-              selectedValue={tipoProblema}
-              onValueChange={(v) => setTipoProblema(String(v))}
-              dropdownIconColor="#111"
-              style={styles.picker}
-            >
-              {PROBLEMAS.map(p => (
-                <Picker.Item key={p.value} label={p.label} value={p.value} />
-              ))}
-            </Picker>
-          </View>
-
-          {/* Descrição */}
-          <Text style={styles.subTitle}>Descrição</Text>
+          <Text style={[styles.subTitle, { color: text }]}>Descrição</Text>
           <TextInput
-            style={styles.inputDesc}
+            style={[
+              styles.inputDesc,
+              { backgroundColor: card, borderColor: border, color: text }
+            ]}
             placeholder="Explica o que está a acontecer..."
-            placeholderTextColor="#999"
+            placeholderTextColor={muted}
             multiline
             value={descricao}
             onChangeText={setDescricao}
           />
 
-          {/* Upload imagem */}
-          <TouchableOpacity style={styles.uploadBtn} onPress={escolherImagem}>
+          <TouchableOpacity
+            style={[styles.uploadBtn, { backgroundColor: '#000' }]}
+            onPress={escolherImagem}
+          >
             <Ionicons name="image" size={20} color="#fff" />
             <Text style={styles.uploadBtnText}>{imagemUri ? 'Alterar imagem' : 'Anexar imagem'}</Text>
           </TouchableOpacity>
+
           {imagemUri && (
             <Image source={{ uri: imagemUri }} style={styles.preview} />
           )}
 
-          {/* Submeter */}
-          <TouchableOpacity style={styles.submitBtn} onPress={submeter} disabled={aEnviar}>
+          <TouchableOpacity
+            style={[styles.submitBtn, { backgroundColor: BRAND.primary }]}
+            onPress={submeter}
+            disabled={aEnviar}
+          >
             <Ionicons name="send" size={20} color="#fff" />
             <Text style={styles.submitBtnText}>{aEnviar ? 'A enviar...' : 'Submeter'}</Text>
           </TouchableOpacity>
@@ -175,7 +203,9 @@ const styles = StyleSheet.create({
     paddingTop: 52,
     paddingBottom: 16,
     paddingHorizontal: 16,
-    justifyContent: 'space-between'
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderColor: '#111'
   },
   headerTitle: {
     color: '#fff',
@@ -183,9 +213,10 @@ const styles = StyleSheet.create({
     fontWeight: '700'
   },
   placeholder: {
-    backgroundColor: '#f2f2f2',
     alignItems: 'center',
-    justifyContent: 'center'
+    justifyContent: 'center',
+    borderTopWidth: 1,
+    borderBottomWidth: 1
   },
   content: {
     padding: 18
@@ -193,45 +224,72 @@ const styles = StyleSheet.create({
   nome: {
     fontSize: 22,
     fontWeight: '800',
-    color: '#111',
-    marginBottom: 4,
-    textAlign: 'center'
+    textAlign: 'center',
+    marginBottom: 4
   },
   morada: {
     fontSize: 15,
-    color: '#666',
-    marginBottom: 18,
-    textAlign: 'center'
+    textAlign: 'center',
+    marginBottom: 18
   },
   subTitle: {
     fontSize: 16,
     fontWeight: '700',
+    marginTop: 12,
     marginBottom: 8
   },
-  pickerWrap: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 12,
-    overflow: 'hidden',
-    marginBottom: 16,
-    backgroundColor: '#fff'
+  tiposWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 16
   },
-  picker: {
-    height: 50
+  tipoChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginRight: 10,
+    marginBottom: 10,
+    borderWidth: 1
+  },
+  dot: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    marginRight: 8
+  },
+  tipoChipText: {
+    fontSize: 16,
+    fontWeight: '700'
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 12
+  },
+  actionBtn: {
+    flex: 1,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8
+  },
+  actionBtnText: {
+    color: '#fff',
+    fontWeight: '800'
   },
   inputDesc: {
     minHeight: 110,
     borderWidth: 1,
-    borderColor: '#ddd',
     borderRadius: 12,
     padding: 12,
     textAlignVertical: 'top',
-    backgroundColor: '#fff',
-    color: '#111',
     marginBottom: 14
   },
   uploadBtn: {
-    backgroundColor: '#000',
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: 'center',
@@ -251,7 +309,6 @@ const styles = StyleSheet.create({
     marginBottom: 16
   },
   submitBtn: {
-    backgroundColor: '#2E7D32',
     borderRadius: 14,
     paddingVertical: 14,
     alignItems: 'center',
