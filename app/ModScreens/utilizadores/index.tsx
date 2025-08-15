@@ -14,9 +14,7 @@ export default function GestaoUtilizadores() {
   const router = useRouter();
   const [q, setQ] = useState('');
 
-  const data = useMemo(() => {
-    return USERS.filter(u => u.nome.toLowerCase().includes(q.toLowerCase()));
-  }, [q]);
+  const data = useMemo(() => USERS.filter(u => u.nome.toLowerCase().includes(q.toLowerCase())), [q]);
 
   const RolePill = ({ role }: { role: string }) => (
     <Text style={[styles.pill, role === 'Moderador' ? styles.pillMod : styles.pillMem]}>
@@ -26,6 +24,12 @@ export default function GestaoUtilizadores() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* LOGO + EcoCollab */}
+      <View style={styles.brandBar}>
+        <Image source={require('../../../assets/logo.png')} style={styles.brandLogo} resizeMode="contain" />
+        <Text style={styles.brandText}>EcoCollab</Text>
+      </View>
+
       <View style={styles.header}>
         <Text style={styles.title}>Gestão de Utilizadores</Text>
         <Text style={styles.subtitle}>Editar, eliminar e ver detalhes</Text>
@@ -65,6 +69,19 @@ export default function GestaoUtilizadores() {
 
 const styles = StyleSheet.create({
   container:{ flex:1, backgroundColor:'#fff' },
+
+  // brand bar
+   brandBar: {
+    backgroundColor: '#EFEADB',          // bege do mockup
+    alignItems: 'center',
+    paddingTop: -20,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#CFCBBF',
+  },
+  brandLogo: { width: 195, height: 99, marginBottom: -20 },
+  brandText: { fontSize: 20, fontWeight: '800', color: '#2E7D32' },
+
   header:{ paddingHorizontal:16, paddingTop:10, paddingBottom:4 },
   title:{ fontSize:22, fontWeight:'800', color:'#111' },
   subtitle:{ color:'#666', marginTop:2 },

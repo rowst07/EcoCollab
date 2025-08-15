@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { FlatList, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { FlatList, Image, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 type Estado = 'Todos' | 'Análise' | 'Resolvido' | 'Irrelevante';
 
@@ -44,7 +44,13 @@ export default function MensagensModerador() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header simples */}
+      {/* LOGO + EcoCollab (logo por baixo do header verde) */}
+      <View style={styles.brandBar}>
+        <Image source={require('../../../assets/logo.png')} style={styles.brandLogo} resizeMode="contain" />
+        <Text style={styles.brandText}>EcoCollab</Text>
+      </View>
+
+      {/* Header simples da página */}
       <View style={styles.header}>
         <Text style={styles.title}>Mensagens</Text>
         <Text style={styles.subtitle}>Reportes enviados pelos membros</Text>
@@ -75,7 +81,7 @@ export default function MensagensModerador() {
         data={filtrados}
         keyExtractor={(i) => i.id}
         renderItem={({ item }) => (
-          <TouchableOpacity style={styles.card} onPress={() => router.push(`../ModScreens/mensagens/${item.id}`)}>
+          <TouchableOpacity style={styles.card} onPress={() => router.push(`/ModScreens/mensagens/${item.id}`)}>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
               <Text style={styles.cardTitle}>Reporte de: {item.autor}</Text>
               <View style={{ marginLeft: 'auto' }}>
@@ -102,6 +108,19 @@ export default function MensagensModerador() {
 
 const styles = StyleSheet.create({
   container: { flex:1, backgroundColor:'#fff' },
+
+  
+  brandBar: {
+    backgroundColor: '#EFEADB',          // bege do mockup
+    alignItems: 'center',
+    paddingTop: -20,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#CFCBBF',
+  },
+  brandLogo: { width: 195, height: 99, marginBottom: -20 },
+  brandText: { fontSize: 20, fontWeight: '800', color: '#2E7D32' },
+
   header: { paddingHorizontal:16, paddingTop:10, paddingBottom:4 },
   title: { fontSize:22, fontWeight:'800', color:'#111' },
   subtitle: { color:'#666', marginTop:2 },

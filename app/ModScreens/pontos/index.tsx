@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { FlatList, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { FlatList, Image, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 const PONTOS = [
   { id: 'p1', nome: 'Ecoponto Centro', tipos: ['vidro'] },
@@ -13,9 +13,7 @@ export default function GestaoPontos() {
   const router = useRouter();
   const [q, setQ] = useState('');
 
-  const data = useMemo(() => {
-    return PONTOS.filter(p => p.nome.toLowerCase().includes(q.toLowerCase()));
-  }, [q]);
+  const data = useMemo(() => PONTOS.filter(p => p.nome.toLowerCase().includes(q.toLowerCase())), [q]);
 
   const TipoCirculo = ({ t }: { t: string }) => {
     const cores: Record<string,string> = {
@@ -26,6 +24,12 @@ export default function GestaoPontos() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* LOGO + EcoCollab */}
+      <View style={styles.brandBar}>
+        <Image source={require('../../../assets/logo.png')} style={styles.brandLogo} resizeMode="contain" />
+        <Text style={styles.brandText}>EcoCollab</Text>
+      </View>
+
       <View style={styles.headerRow}>
         <View>
           <Text style={styles.title}>Gestão de Pontos</Text>
@@ -69,6 +73,19 @@ export default function GestaoPontos() {
 
 const styles = StyleSheet.create({
   container:{ flex:1, backgroundColor:'#fff' },
+
+  // brand bar
+   brandBar: {
+    backgroundColor: '#EFEADB',          // bege do mockup
+    alignItems: 'center',
+    paddingTop: -20,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#CFCBBF',
+  },
+  brandLogo: { width: 195, height: 99, marginBottom: -20 },
+  brandText: { fontSize: 20, fontWeight: '800', color: '#2E7D32' },
+
   headerRow:{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingHorizontal:16, paddingTop:10 },
   title:{ fontSize:22, fontWeight:'800', color:'#111' },
   subtitle:{ color:'#666', marginTop:2 },

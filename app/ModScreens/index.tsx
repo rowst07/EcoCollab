@@ -1,22 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function ModHome() {
   const router = useRouter();
 
   const Card = ({
-    icon,
-    title,
-    subtitle,
-    to,
-  }: {
-    icon: keyof typeof Ionicons.glyphMap;
-    title: string;
-    subtitle: string;
-    to: string;
-  }) => (
+    icon, title, subtitle, to,
+  }: { icon: keyof typeof Ionicons.glyphMap; title: string; subtitle: string; to: string }) => (
     <TouchableOpacity style={styles.card} onPress={() => router.push(to)}>
       <View style={styles.cardIconWrap}>
         <Ionicons name={icon} size={22} color="#2E7D32" />
@@ -30,7 +22,17 @@ export default function ModHome() {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
+      {/* LOGO + EcoCollab (logo por baixo do header verde) */}
+      <View style={styles.brandBar}>
+        <Image
+          source={require('../../assets/logo.png')} // <- caminho correto para este ficheiro
+          style={styles.brandLogo}
+          resizeMode="contain"
+        />
+        <Text style={styles.brandText}>EcoCollab</Text>
+      </View>
+
       <Text style={styles.headerTitle}>Painel de Moderador</Text>
       <Text style={styles.headerSub}>Escolhe uma secção para gerir</Text>
 
@@ -54,12 +56,28 @@ export default function ModHome() {
         subtitle="Adicionar, editar ou eliminar pontos"
         to="/ModScreens/pontos"
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff', padding: 16 },
+
+  // brand bar
+  brandBar: {
+    backgroundColor: '#EFEADB',
+    alignItems: 'center',
+    paddingTop: -20,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#CFCBBF',
+    marginHorizontal: -16, // esticar a faixa até às margens
+    marginTop: -16,        // colar mais ao header
+    marginBottom: 12,
+  },
+  brandLogo: { width: 195, height: 99, marginBottom: -20 },
+  brandText: { fontSize: 20, fontWeight: '800', color: '#2E7D32' },
+
   headerTitle: { fontSize: 22, fontWeight: '800', color: '#2E7D32' },
   headerSub: { fontSize: 14, color: '#666', marginTop: 4 },
 
