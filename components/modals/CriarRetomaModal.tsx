@@ -1,7 +1,9 @@
 import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
+  BackHandler,
   Image,
   Modal,
   Platform,
@@ -39,12 +41,58 @@ export default function NovaRetomaModal({ visible, onClose, onPublicar }: Props)
     }
   };
 
+  // Existe algo por guardar?
+  const hasDirtyFields = useMemo(() => {
+    const nomeDirty = nome.trim().length > 0;
+    const tipoDirty = tipo !== 'Doação';
+    const pontosVal = (pontos ?? '').trim();
+    const pontosDirty = pontosVal !== '' && pontosVal !== '0';
+    const descDirty = descricao.trim().length > 0;
+    const imgDirty = !!imagem;
+    return nomeDirty || tipoDirty || pontosDirty || descDirty || imgDirty;
+  }, [nome, tipo, pontos, descricao, imagem]);
+
+  const attemptClose = () => {
+    if (!hasDirtyFields) {
+      onClose();
+      return;
+    }
+    Alert.alert(
+      'Sair sem guardar?',
+      'Tens alterações por guardar. Queres sair e perder o que foi preenchido?',
+      [
+        { text: 'Continuar a editar', style: 'cancel' },
+        {
+          text: 'Sair sem guardar',
+          style: 'destructive',
+          onPress: () => onClose(),
+        },
+      ],
+    );
+  };
+
+  // Botão/gesto físico de voltar no Android
+  useEffect(() => {
+    if (!visible) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      attemptClose();
+      return true;
+    });
+    return () => sub.remove();
+  }, [visible, hasDirtyFields]);
+
   const publicar = () => {
     if (!nome.trim()) {
       alert('Preencha o nome do item.');
       return;
     }
-    const nova = { nome: nome.trim(), tipo, pontos: parseInt(pontos) || 0, descricao: descricao.trim(), imagem };
+    const nova = {
+      nome: nome.trim(),
+      tipo,
+      pontos: parseInt(pontos) || 0,
+      descricao: descricao.trim(),
+      imagem,
+    };
     onPublicar(nova);
     onClose();
     // Reset
@@ -56,12 +104,27 @@ export default function NovaRetomaModal({ visible, onClose, onPublicar }: Props)
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={attemptClose} // Android back chama confirmação
+    >
       <View style={styles.modalOverlay}>
         <View style={styles.modalContainer}>
-          {/* Header */}
-          <View style={styles.header}>
+          {/* Header com seta de recuo */}
+          <View style={styles.headerRow}>
+            <TouchableOpacity
+              onPress={attemptClose}
+              style={styles.backBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Voltar sem guardar"
+            >
+              <Feather name="arrow-left" size={22} color="#fff" />
+            </TouchableOpacity>
             <Text style={styles.headerText}>Nova Retoma</Text>
+            {/* Espaçador para centrar o título */}
+            <View style={{ width: 44 }} />
           </View>
 
           {/* Conteúdo */}
@@ -125,7 +188,7 @@ export default function NovaRetomaModal({ visible, onClose, onPublicar }: Props)
               <Text style={styles.publicarText}>Publicar Retoma</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.cancelarBtn} onPress={onClose}>
+            <TouchableOpacity style={styles.cancelarBtn} onPress={attemptClose}>
               <Text style={styles.cancelarText}>Cancelar</Text>
             </TouchableOpacity>
           </View>
@@ -147,13 +210,24 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 40,
     borderTopRightRadius: 40,
   },
-  header: {
+  headerRow: {
     backgroundColor: '#000',
-    paddingVertical: 20,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
     marginBottom: 20,
-    alignItems: 'center',
     borderTopLeftRadius: 40,
     borderTopRightRadius: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  backBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    backgroundColor: '#1f1f1f',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerText: {
     fontSize: 24,
@@ -194,7 +268,7 @@ const styles = StyleSheet.create({
   },
   tipoText: {
     fontWeight: '700',
-    color: '#fff'
+    color: '#fff',
   },
   tipoTextInativo: {
     color: '#333',
