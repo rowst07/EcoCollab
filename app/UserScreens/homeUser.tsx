@@ -69,7 +69,7 @@ export default function HomeUser() {
     return ecopontos.filter(e => {
       const nomeOk = e.nome.toLowerCase().includes(pesquisa.toLowerCase());
       const tipos = Array.isArray(e.tipos) ? e.tipos : [e.tipo ?? 'outros'];
-      const algumTipoAtivo = tipos.some((t: string) => filtros[t] === true);
+      const algumTipoAtivo = tipos.some((t: string) => (filtros as any)[t] === true);
       const classOk = filtros.classificacao === 'todos' || e.classificacao >= Number(filtros.classificacao);
       return nomeOk && algumTipoAtivo && classOk;
     });
@@ -162,6 +162,16 @@ export default function HomeUser() {
       {/* Botão flutuante para criar novo ponto */}
       <TouchableOpacity style={styles.fab} onPress={() => console.log('Criar novo ponto')}>
         <Ionicons name="add" size={28} color="#fff" />
+      </TouchableOpacity>
+
+      {/* Botão “Painel de Moderador” (por agora visível para todos) */}
+      <TouchableOpacity
+        style={styles.modBtn}
+        onPress={() => router.push('/ModScreens')}
+        accessibilityRole="button"
+        accessibilityLabel="Abrir painel de moderador"
+      >
+        <Text style={styles.modBtnText}>Painel de Moderador</Text>
       </TouchableOpacity>
 
       {/* Modal de Pesquisa */}
@@ -264,7 +274,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    alignSelf: 'center', // centraliza dentro do card
+    alignSelf: 'center',
     marginTop: 8
   },
   infoBtnText: {
@@ -290,5 +300,27 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4
+  },
+
+  // Botão "Painel de Moderador"
+  modBtn: {
+    position: 'absolute',
+    bottom: 110, // acima da bottom bar
+    left: 12,
+    backgroundColor: '#2E7D32',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    elevation: 6,
+    zIndex: 998,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4
+  },
+  modBtnText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 14
   }
 });
