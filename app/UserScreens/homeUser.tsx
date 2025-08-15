@@ -1,15 +1,21 @@
 import PesquisaModal from '@/components/modals/PesquisaModal';
-import { MAP_STYLE, RESIDUE_COLORS } from '@/constants/Colors';
-import { useTheme, useThemeColor } from '@/hooks/useThemeColor';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import MapView, { Callout, Marker } from 'react-native-maps';
 
+const cores: Record<string, string> = {
+  papel: '#2196F3',
+  plastico: '#FFEB3B',
+  vidro: '#4CAF50',
+  pilhas: '#F44336',
+  organico: '#795548',
+  metal: '#9E9E9E',
+  outros: '#9C27B0'
+};
+
 export default function HomeUser() {
-  const t = useTheme();
-  const textMuted = useThemeColor('textMuted');
   const router = useRouter();
 
   const [ecopontos, setEcopontos] = useState<any[]>([]);
@@ -78,7 +84,7 @@ export default function HomeUser() {
     return (
       <View style={styles.circulosRow}>
         {tipos.map((t: string, idx: number) => (
-          <View key={idx} style={[styles.circulo, { backgroundColor: RESIDUE_COLORS[t] || RESIDUE_COLORS.outros }]} />
+          <View key={idx} style={[styles.circulo, { backgroundColor: cores[t] || cores.outros }]} />
         ))}
       </View>
     );
@@ -101,11 +107,12 @@ export default function HomeUser() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: t.bg }}>
+    <View style={{ flex: 1 }}>
+      {/* Barra de Pesquisa (abre modal) */}
       <View style={styles.topBar}>
-        <TouchableOpacity style={[styles.searchBar, { backgroundColor: t.card, borderColor: t.inputBorder }]} onPress={() => setPesquisaModal(true)}>
-          <Ionicons name="search" size={20} color={t.icon} />
-          <Text style={[styles.searchPlaceholder, { color: textMuted }]}>
+        <TouchableOpacity style={styles.searchBar} onPress={() => setPesquisaModal(true)}>
+          <Ionicons name="search" size={20} color="#888" />
+          <Text style={styles.searchPlaceholder}>
             {pesquisa ? pesquisa : 'Pesquisar ecoponto...'}
           </Text>
         </TouchableOpacity>
@@ -114,7 +121,6 @@ export default function HomeUser() {
       {/* Mapa */}
       <MapView
         style={{ flex: 1 }}
-        customMapStyle={MAP_STYLE.dark}
         initialRegion={{
           latitude: 41.805,
           longitude: -6.756,
