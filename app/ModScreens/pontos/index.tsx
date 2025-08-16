@@ -78,12 +78,12 @@ const styles = StyleSheet.create({
    brandBar: {
     backgroundColor: '#EFEADB',          // bege do mockup
     alignItems: 'center',
-    paddingTop: -20,
-    paddingBottom: 12,
+    paddingTop: 0,
+    paddingBottom: 1,
     borderBottomWidth: 1,
     borderBottomColor: '#CFCBBF',
   },
-  brandLogo: { width: 195, height: 99, marginBottom: -20 },
+  brandLogo: { width: 195, height: 99, marginBottom: -20, marginTop: -10 },
   brandText: { fontSize: 20, fontWeight: '800', color: '#2E7D32' },
 
   headerRow:{ flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingHorizontal:16, paddingTop:10 },

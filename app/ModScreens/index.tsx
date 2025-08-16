@@ -8,8 +8,13 @@ export default function ModHome() {
 
   const Card = ({
     icon, title, subtitle, to,
-  }: { icon: keyof typeof Ionicons.glyphMap; title: string; subtitle: string; to: string }) => (
-    <TouchableOpacity style={styles.card} onPress={() => router.push(to)}>
+  }: {
+    icon: keyof typeof Ionicons.glyphMap;
+    title: string;
+    subtitle: string;
+    to: '/ModScreens/mensagens' | '/ModScreens/utilizadores' | '/ModScreens/pontos';
+  }) => (
+    <TouchableOpacity style={styles.card} onPress={() => router.push({ pathname: to })}>
       <View style={styles.cardIconWrap}>
         <Ionicons name={icon} size={22} color="#2E7D32" />
       </View>
@@ -26,7 +31,7 @@ export default function ModHome() {
       {/* LOGO + EcoCollab (logo por baixo do header verde) */}
       <View style={styles.brandBar}>
         <Image
-          source={require('../../assets/logo.png')} // <- caminho correto para este ficheiro
+          source={require('../../assets/logo.png')}
           style={styles.brandLogo}
           resizeMode="contain"
         />
@@ -67,7 +72,7 @@ const styles = StyleSheet.create({
   brandBar: {
     backgroundColor: '#EFEADB',
     alignItems: 'center',
-    paddingTop: -20,
+    paddingTop: 10,
     paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#CFCBBF',
@@ -75,8 +80,8 @@ const styles = StyleSheet.create({
     marginTop: -16,        // colar mais ao header
     marginBottom: 12,
   },
-  brandLogo: { width: 195, height: 99, marginBottom: -20 },
-  brandText: { fontSize: 20, fontWeight: '800', color: '#2E7D32' },
+  brandLogo: { width: 200, height: 99, marginBottom: -30, marginTop:-20  }, // logo maior
+  brandText: { fontSize: 22, fontWeight: '800', color: '#2E7D32' },
 
   headerTitle: { fontSize: 22, fontWeight: '800', color: '#2E7D32' },
   headerSub: { fontSize: 14, color: '#666', marginTop: 4 },
