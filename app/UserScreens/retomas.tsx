@@ -1,4 +1,5 @@
 import NovaRetomaModal from '@/components/modals/CriarRetomaModal';
+import { THEME } from '@/constants/Colors';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useState } from 'react';
 import {
@@ -8,6 +9,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+
+const colors = THEME.dark;
 
 const retomasDisponiveis = [
   {
@@ -78,13 +81,13 @@ export default function Retomas() {
         contentContainerStyle={{ paddingBottom: 100 }}
         renderItem={({ item }) => (
           <View style={styles.card}>
-            <MaterialCommunityIcons name={item.icon} size={32} color="#2E7D32" style={styles.icon} />
+            <MaterialCommunityIcons name={item.icon} size={32} color={colors.primary} style={styles.icon} />
             <View style={styles.cardContent}>
-              <Text style={styles.itemTitle}>{item.nome}</Text>
-              <Text style={styles.itemType}>Tipo: {item.tipo}</Text>
+              <Text style={[styles.itemTitle, { color: colors.textOnCard }]}>{item.nome}</Text>
+              <Text style={[styles.itemType, { color: colors.textOnCard }]}>{`Tipo: ${item.tipo}`}</Text>
               <Text style={styles.itemPoints}>+{item.pontos} pontos</Text>
               <TouchableOpacity style={styles.btn}>
-                <Text style={styles.btnText}>Ver detalhes</Text>
+                <Text style={[styles.btnText, { color: colors.textOnCard }]}>Ver detalhes</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -94,7 +97,7 @@ export default function Retomas() {
       {/* Botão de publicar retoma */}
       {abaAtiva === 'minhas' && (
         <TouchableOpacity style={styles.floatingBtn} onPress={() => setModalVisible(true)}>
-          <MaterialCommunityIcons name="plus" size={24} color="#fff" />
+          <MaterialCommunityIcons name="plus" size={24} color={colors.textInput} />
           <Text style={styles.floatingBtnText}>Publicar retoma</Text>
         </TouchableOpacity>
       )}
@@ -112,7 +115,7 @@ export default function Retomas() {
 const styles = StyleSheet.create({
   wrapper: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: colors.bg,
     paddingTop: 60,
     paddingHorizontal: 20,
   },
@@ -121,6 +124,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
     marginBottom: 20,
+    color: colors.text,
   },
   tabs: {
     flexDirection: 'row',
@@ -130,24 +134,24 @@ const styles = StyleSheet.create({
   tab: {
     paddingVertical: 10,
     paddingHorizontal: 20,
-    backgroundColor: '#eee',
+    backgroundColor: colors.card,
     borderRadius: 20,
     marginHorizontal: 5,
   },
   tabText: {
     fontSize: 16,
-    color: '#333',
+    color: colors.text,
   },
   activeTab: {
-    backgroundColor: '#2E7D32',
+    backgroundColor: colors.primary,
   },
   activeTabText: {
-    color: '#fff',
+    color: colors.textInput,
     fontWeight: 'bold',
   },
   card: {
     flexDirection: 'row',
-    backgroundColor: '#f9f9f9',
+    backgroundColor: colors.card,
     padding: 16,
     borderRadius: 12,
     marginBottom: 16,
@@ -167,30 +171,28 @@ const styles = StyleSheet.create({
   },
   itemType: {
     fontSize: 14,
-    color: '#888',
     marginBottom: 2,
   },
   itemPoints: {
     fontSize: 14,
-    color: '#2E7D32',
+    color: colors.primary,
     marginBottom: 8,
   },
   btn: {
-    backgroundColor: '#2E7D32',
+    backgroundColor: colors.primary,
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 8,
     alignSelf: 'flex-start',
   },
   btnText: {
-    color: '#fff',
     fontSize: 14,
     fontWeight: '500',
   },
   floatingBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#2E7D32',
+    backgroundColor: colors.primary,
     padding: 12,
     borderRadius: 15,
     position: 'absolute',
@@ -200,7 +202,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   floatingBtnText: {
-    color: '#fff',
+    color: colors.textInput,
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,

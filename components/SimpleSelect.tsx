@@ -20,6 +20,9 @@ export function SimpleSelect({
   const card = useThemeColor('card');
   const border = useThemeColor('border');
   const text = useThemeColor('text');
+  // Sheet flutuante: preto com textos brancos; botão compacto: preto
+  const sheetBg = '#18181B';
+  const sheetText = '#fff';
   const overlay = useThemeColor('overlay');
 
   const current = options.find(o => o.value === value);
@@ -32,10 +35,10 @@ export function SimpleSelect({
         onPress={() => setOpen(true)}
         activeOpacity={0.8}
       >
-        <Text style={[s.selectText, { color: text }]} numberOfLines={1}>
+        <Text style={[s.selectText, { color: '#000' }]} numberOfLines={1}>
           {current?.label ?? placeholder}
         </Text>
-        <Ionicons name="chevron-down" size={18} color={text} />
+        <Ionicons name="chevron-down" size={18} color="#000" />
       </TouchableOpacity>
 
       {/* OVERLAY EM MODAL (fica por cima de tudo) */}
@@ -48,11 +51,11 @@ export function SimpleSelect({
       >
         <View style={[s.backdrop, { backgroundColor: overlay }]}>
           {/* Sheet flutuante */}
-          <View style={[s.sheet, { backgroundColor: card, borderColor: border }]}>
+          <View style={[s.sheet, { backgroundColor: sheetBg, borderColor: border }]}> 
             <View style={s.sheetHeader}>
-              <Text style={[s.sheetTitle, { color: text }]} numberOfLines={1}>Escolher</Text>
+              <Text style={[s.sheetTitle, { color: sheetText }]} numberOfLines={1}>Escolher</Text>
               <TouchableOpacity onPress={() => setOpen(false)} hitSlop={10}>
-                <Ionicons name="close" size={20} color={text} />
+                <Ionicons name="close" size={20} color={sheetText} />
               </TouchableOpacity>
             </View>
 
@@ -65,7 +68,7 @@ export function SimpleSelect({
                   onPress={() => { onChange(item.value); setOpen(false); }}
                   activeOpacity={0.8}
                 >
-                  <Text style={[s.optionText, { color: text }]} numberOfLines={1}>
+                  <Text style={[s.optionText, { color: sheetText }]} numberOfLines={1}>
                     {item.label}
                   </Text>
                   {item.value === value && <Ionicons name="checkmark" size={18} color={BRAND.primary} />}

@@ -160,7 +160,7 @@ export default function HomeUser() {
       </MapView>
 
       {/* Botão flutuante para criar novo ponto */}
-      <TouchableOpacity style={styles.fab} onPress={() => console.log('Criar novo ponto')}>
+      <TouchableOpacity style={styles.fab} onPress={() => router.push('/UserScreens/criarEcoponto')}>
         <Ionicons name="add" size={28} color="#fff" />
       </TouchableOpacity>
 

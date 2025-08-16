@@ -164,6 +164,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#000',
     paddingVertical: 10,
+    paddingTop: 50,
   },
   logoRow: {
     flexDirection: 'row',

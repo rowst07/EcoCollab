@@ -51,7 +51,7 @@ export default function Definicoes() {
   const terminarSessao = () => {
     Alert.alert('Terminar sessão', 'Tens a certeza que queres terminar sessão?', [
       { text: 'Cancelar', style: 'cancel' },
-      { text: 'Terminar', style: 'destructive', onPress: () => console.log('logout') }
+      { text: 'Terminar', style: 'destructive', onPress: () => router.push('/SharedScreens/login') }
     ]);
   };
 
@@ -198,10 +198,14 @@ function Item({
   const card = useThemeColor('card');
 
   return (
-    <TouchableOpacity style={[styles.item, { borderBottomColor: border, backgroundColor: card }]} onPress={onPress}>
+    <TouchableOpacity
+      style={[styles.item, { borderBottomColor: border, backgroundColor: '#18181B' }]}
+      onPress={onPress}
+      activeOpacity={1}
+    >
       <View style={styles.itemLeft}>
         <Ionicons name={icon} size={20} color={danger ? '#ef4444' : text} />
-        <Text style={[styles.itemLabel, { color: danger ? '#ef4444' : text }]}>{label}</Text>
+        <Text style={[styles.itemLabel, { color: danger ? '#ef4444' : '#fff' }]}>{label}</Text>
       </View>
       <Ionicons name="chevron-forward" size={18} color="#9ca3af" />
     </TouchableOpacity>
@@ -214,7 +218,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   const card = useThemeColor('card');
 
   return (
-    <View style={[styles.row, { borderBottomColor: border, backgroundColor: card }]}>
+    <View style={[styles.row, { borderBottomColor: border, backgroundColor: '#000' }]}>
       <Text style={[styles.rowLabel, { color: textMuted }]}>{label}</Text>
       <View style={{ flex: 1 }}>{children}</View>
     </View>
@@ -235,9 +239,9 @@ function ToggleRow({
   const card = useThemeColor('card');
 
   return (
-    <View style={[styles.item, { borderBottomColor: border, backgroundColor: card }]}>
+  <View style={[styles.item, { borderBottomColor: border, backgroundColor: '#18181B' }]}> 
       <View style={styles.itemLeft}>
-        <Text style={[styles.itemLabel, { color: text }]}>{label}</Text>
+  <Text style={[styles.itemLabel, { color: '#fff' }]}>{label}</Text>
       </View>
       <Switch
         value={value}
@@ -309,7 +313,8 @@ const styles = StyleSheet.create({
   versionBox: {
     paddingHorizontal: 14,
     paddingVertical: 14,
-    alignItems: 'flex-start'
+    alignItems: 'flex-start',
+    backgroundColor: '#18181B',
   },
   versionText: {
     fontSize: 14

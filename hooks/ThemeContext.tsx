@@ -1,6 +1,6 @@
+import { THEME, ThemeName } from '@/constants/Colors';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Appearance } from 'react-native';
-import { ThemeName, THEME } from '@/constants/Colors';
 
 // 'system' = segue o SO, 'light' = claro, 'dark' = escuro
 export type AppTheme = ThemeName | 'system';

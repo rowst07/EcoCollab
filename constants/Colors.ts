@@ -42,15 +42,16 @@ export const THEME = {
   },
   dark: {
     bg:        '#000000',
-    card:      '#262626ff',
+    card:      '#EEEDD7',
     overlay:   '#00000099',
     border:    '#18181B',
     hairline:  '#18181B',
     input:     '#EEEDD7',
     inputBorder: '#262626',
 
-    text:      '#E5E7EB',
-    textInput: '#000',
+    text:      '#E5E7EB', // texto padrão sobre fundo escuro
+    textInput: '#000',    // texto sobre card/input claro
+    textOnCard: '#000',   // texto sobre card/input claro
     textMuted: '#9CA3AF',
     icon:      '#E5E7EB',
 
