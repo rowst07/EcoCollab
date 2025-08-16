@@ -80,7 +80,7 @@ const styles = StyleSheet.create({
     marginTop: -16,        // colar mais ao header
     marginBottom: 12,
   },
-  brandLogo: { width: 200, height: 64, marginBottom: 4 }, // logo maior
+  brandLogo: { width: 200, height: 99, marginBottom: -30, marginTop:-20  }, // logo maior
   brandText: { fontSize: 22, fontWeight: '800', color: '#2E7D32' },
 
   headerTitle: { fontSize: 22, fontWeight: '800', color: '#2E7D32' },
