@@ -1,14 +1,20 @@
 import BottomNavbar from '@/components/BottomNavbar';
+import { useProtectedRoute } from '@/hooks/useProtectedRoute';
+import { AuthProvider, useAuth } from '@/services/AuthContext';
 import { Stack, usePathname } from 'expo-router';
 
-export default function Layout() {
+
+function Layout() {
   const pathname = usePathname();
+  const { user, loading } = useAuth();
+
+  useProtectedRoute(user, loading);
 
   const showNavbar = [
     '/UserScreens/homeUser',
     '/UserScreens/retomas',
     '/SharedScreens/perfil',
-  ].includes(pathname);
+  ].includes(pathname || '');
 
   return (
     <>
@@ -20,5 +26,13 @@ export default function Layout() {
       />
       {showNavbar && <BottomNavbar />}
     </>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <AuthProvider>
+      <Layout />
+    </AuthProvider>
   );
 }

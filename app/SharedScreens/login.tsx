@@ -1,7 +1,10 @@
+import { useAuth } from '@/services/AuthContext';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import React, { useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -10,11 +13,13 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
 
 export default function Login() {
   const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const { signIn, resetPassword } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -73,13 +78,51 @@ export default function Login() {
               </TouchableOpacity>
             </View>
             <TouchableOpacity>
-              <Text style={styles.forgotPasswordText}>Esqueceu-se da palavra-passe?</Text>
+              <Text 
+                style={styles.forgotPasswordText}
+                onPress={async () => {
+                  try {
+                    await resetPassword(email);
+                    Alert.alert('Verifique o seu email para redefinir a palavra-passe.');
+                  } catch (error: any) {
+                    Alert.alert('Erro ao redefinir a palavra-passe: ', error);
+                  }
+                }}>Esqueceu-se da palavra-passe?</Text>
             </TouchableOpacity>
           </View>
 
           <View style={styles.bottomSection}>
-            <TouchableOpacity style={styles.button} onPress={() => router.push('/UserScreens/homeUser')}>
-              <Text style={styles.buttonText}>Entrar</Text>
+            <TouchableOpacity 
+              style={styles.button} 
+              onPress={
+                async () => {
+                  const mail = email.trim();
+                  if (!mail || !password) {
+                    Alert.alert('Campos obrigatórios', 'Preencha email e palavra‑passe.');
+                    return;
+                  }
+                  // validação simples de email (opcional)
+                  if (!/^\S+@\S+\.\S+$/.test(mail)) {
+                    Alert.alert('Email inválido', 'Indique um email válido.');
+                    return;
+                  }
+
+                  try {
+                    setLoading(true);
+                    await signIn(mail, password);
+                    router.replace('/UserScreens/homeUser');
+                  } catch (error: any) {
+                    Alert.alert('Erro ao iniciar sessão', error?.message ?? 'Tente novamente.');
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+              >
+                {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.buttonText}>Entrar</Text>
+              )}
             </TouchableOpacity>
 
             <TouchableOpacity onPress={() => router.push('/SharedScreens/register')}>
