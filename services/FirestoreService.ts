@@ -1,19 +1,15 @@
-// FirestoreService.ts
-// Serviço utilitário para interagir com o Firestore (v9 modular)
-// REQUISITO: NÃO criar documento por omissão — guardar APENAS os campos vindos da página "Criar Conta":
-// id (uid), nome, email, morada, role, dataCriacao, dataAtualizacao.
-// Os restantes campos (foto, telemóvel, etc.) serão adicionados depois na página "Editar Perfil".
-
 import { User } from 'firebase/auth';
 import {
-    collection,
-    doc,
-    getDoc,
-    serverTimestamp,
-    setDoc,
-    updateDoc,
+  collection,
+  doc,
+  getDoc,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
 } from 'firebase/firestore';
 import { db } from '../firebase';
+
+import { onSnapshot, type Unsubscribe } from 'firebase/firestore';
 
 export type Role = 'user' | 'moderator' | 'admin';
 
@@ -72,4 +68,28 @@ export async function updateUserMinimalDoc(
 export async function getUserMinimalDoc(uid: string) {
   const snap = await getDoc(userRef(uid));
   return snap.exists() ? (snap.data() as UserMinimalDoc) : null;
+}
+
+export type UserExtras = {
+  telemovel?: string;
+  fotoURL?: string;
+  dataNasc?: string;
+};
+
+/** Atualiza campos “extras” do perfil + dataAtualizacao (NÃO mexe em role/id/dataCriacao). */
+export async function updateUserExtrasDoc(uid: string, extras: UserExtras) {
+  await updateDoc(userRef(uid), {
+    ...extras,
+    dataAtualizacao: serverTimestamp(),
+  });
+}
+
+/** Subscrição em tempo-real ao doc do utilizador. */
+export function subscribeUserDoc(
+  uid: string,
+  callback: (data: (UserMinimalDoc & UserExtras) | null) => void
+): Unsubscribe {
+  return onSnapshot(userRef(uid), (snap) => {
+    callback(snap.exists() ? (snap.data() as UserMinimalDoc & UserExtras) : null);
+  });
 }

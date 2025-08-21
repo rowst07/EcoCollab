@@ -1,23 +1,27 @@
-// useUserDoc.ts
-import { onSnapshot } from 'firebase/firestore';
+// hooks/useUserDoc.ts
+import { useAuth } from '@/services/AuthContext';
+import { subscribeUserDoc, type UserExtras, type UserMinimalDoc } from '@/services/FirestoreService';
 import { useEffect, useState } from 'react';
-import { useAuth } from '../services/AuthContext';
-import { userRef } from '../services/FirestoreService';
+
+export type FullUserDoc = UserMinimalDoc & UserExtras;
 
 export function useUserDoc() {
   const { user } = useAuth();
-  const [userDoc, setUserDoc] = useState<any>(null);
+  const [doc, setDoc] = useState<FullUserDoc | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!user) {
-      setUserDoc(null);
+    if (!user?.uid) {
+      setDoc(null);
+      setLoading(false);
       return;
     }
-    const unsub = onSnapshot(userRef(user.uid), (snap) => {
-      setUserDoc(snap.exists() ? snap.data() : null);
+    const unsub = subscribeUserDoc(user.uid, (d) => {
+      setDoc(d);
+      setLoading(false);
     });
     return unsub;
-  }, [user]);
+  }, [user?.uid]);
 
-  return userDoc;
+  return { userDoc: doc, loading };
 }
