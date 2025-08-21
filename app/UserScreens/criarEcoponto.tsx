@@ -1,7 +1,7 @@
 // app/SharedScreens/criarEcoponto.tsx
 import { MapModal } from '@/components/modals/MapModal';
 import { BRAND, RESIDUE_COLORS, THEME } from '@/constants/Colors';
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import {
@@ -106,13 +106,20 @@ export default function CriarEcoponto() {
   const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
   return (
-    <View style={{ flex: 1, backgroundColor: T.bg }}>
+    <View style={[styles.wrapper, { backgroundColor: T.bg }]}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={28} color="#fff" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Detalhes do Ecoponto</Text>
+        <View style={{ width: 28 }} />
+      </View>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20, paddingTop: 60 }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20, paddingTop: 30 }}>
           {/* Foto */}
           <View style={styles.photoRow}>
             <Image
@@ -229,7 +236,7 @@ export default function CriarEcoponto() {
         onRequestClose={() => setResidueModalOpen(false)}
       >
         <Pressable style={styles.modalBackdrop} onPress={() => setResidueModalOpen(false)} />
-        <View style={[styles.filterSheet, { backgroundColor: T.card }]}>
+        <View style={[styles.filterSheet, { backgroundColor: T.bg }]}>
           <View style={styles.sheetHandle} />
           <Text style={[styles.sheetTitle, { color: T.text }]}>Seleciona os tipos</Text>
           <ScrollView style={{ maxHeight: 320 }}>
@@ -361,6 +368,28 @@ const styles = StyleSheet.create({
   photoRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   photo: { width: 110, height: 82, borderRadius: 10, marginRight: 12 },
   photoBtns: { gap: 8 },
+
+  wrapper: {
+    flex: 1,
+    paddingTop: 60,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  header: {
+    backgroundColor: '#000',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingBottom: 16,
+    paddingHorizontal: 16,
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderColor: '#111'
+  },
+  headerTitle: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '700'
+  },
 
   primaryBtn: {
     flexDirection: 'row',

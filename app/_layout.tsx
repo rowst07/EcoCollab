@@ -1,11 +1,8 @@
-<<<<<<< HEAD
-=======
-import BottomNavbar from '@/components/BottomNavbar';
 import { useProtectedRoute } from '@/hooks/useProtectedRoute';
 import { AuthProvider, useAuth } from '@/services/AuthContext';
->>>>>>> 013c4b1f97a2dd3c76c21ac5cb392439add31a01
+
 import { Stack, usePathname } from 'expo-router';
-import BottomNavbar from '../components/bottomNavbar';
+import BottomNavbar from '../components/BottomNavbar';
 
 export default function RootLayout() {
   return (

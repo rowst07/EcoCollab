@@ -69,11 +69,11 @@ export default function Perfil() {
       <View style={styles.statsSection}>
         <View style={[styles.statBox, { backgroundColor: T.card, borderColor: T.border }]}>
           <Text style={[styles.statNumber, { color: BRAND.primary }]}>38</Text>
-          <Text style={[styles.statLabel, { color: T.text }]}>{'Retomas'}</Text>
+          <Text style={[styles.statLabel, { color: T.textInput }]}>{'Retomas'}</Text>
         </View>
         <View style={[styles.statBox, { backgroundColor: T.card, borderColor: T.border }]}>
           <Text style={[styles.statNumber, { color: BRAND.primary }]}>1240</Text>
-          <Text style={[styles.statLabel, { color: T.text }]}>{'Pontos'}</Text>
+          <Text style={[styles.statLabel, { color: T.textInput }]}>{'Pontos'}</Text>
         </View>
       </View>
 
@@ -84,14 +84,14 @@ export default function Perfil() {
         <TouchableOpacity
           style={[styles.historyItem, { backgroundColor: T.card, borderColor: T.border }]}
         >
-          <Text style={[styles.historyText, { color: T.text }]}>Histórico de Recompensas</Text>
+          <Text style={[styles.historyText, { color: T.textInput }]}>Histórico de Recompensas</Text>
           <Feather name="chevron-right" size={18} color={T.icon} />
         </TouchableOpacity>
 
         <TouchableOpacity
           style={[styles.historyItem, { backgroundColor: T.card, borderColor: T.border }]}
         >
-          <Text style={[styles.historyText, { color: T.text }]}>Histórico de Reciclagem</Text>
+          <Text style={[styles.historyText, { color: T.textInput }]}>Histórico de Reciclagem</Text>
           <Feather name="chevron-right" size={18} color={T.icon} />
         </TouchableOpacity>
       </View>
@@ -164,11 +164,11 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   statNumber: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: 'bold',
   },
   statLabel: {
-    fontSize: 14,
+    fontSize: 20,
     marginTop: 6,
   },
 
