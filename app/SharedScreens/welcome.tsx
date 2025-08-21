@@ -1,9 +1,22 @@
+import { useAuth } from '@/services/AuthContext';
 import { useRouter } from 'expo-router';
-import { Dimensions, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useCallback } from 'react';
+import { ActivityIndicator, Dimensions, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function Welcome() {
   const router = useRouter();
+  const {user, loading} = useAuth();
   const { height } = Dimensions.get('window');
+
+  const handleStart = useCallback(() => {
+    if (loading) return;
+
+    if (user) {
+      router.replace('../UserScreens/homeUser');
+    } else {
+      router.push('/SharedScreens/login');
+    }
+  }, [loading, user, router]);
 
   return (
     <View style={styles.wrapper}>
@@ -25,8 +38,8 @@ export default function Welcome() {
           A sua solução ideal para o ajudar e incentivar a tornar este mundo um lugar melhor.
         </Text>
 
-        <TouchableOpacity style={styles.button} onPress={() => router.push('/SharedScreens/login')}>
-          <Text style={styles.buttonText}>Iniciar</Text>
+        <TouchableOpacity style={styles.button} onPress={handleStart}>
+          {loading ? <ActivityIndicator /> : <Text style={styles.buttonText}>Iniciar</Text>}
         </TouchableOpacity>
       </View>
     </View>

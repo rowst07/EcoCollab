@@ -184,7 +184,7 @@ export default function Register() {
 
               try {
                 setLoading(true);
-                await signUp(name, mail, password);
+                await signUp(name, email, password, address, 'user');
                 Alert.alert('Conta criada', 'Faça login para continuar.');
                 router.replace('/SharedScreens/login'); // ← vai para o Login
               } catch (error: any) {

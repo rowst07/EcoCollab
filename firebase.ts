@@ -1,14 +1,14 @@
+// firebase.ts
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getApp, getApps, initializeApp } from 'firebase/app';
+import { FirebaseApp, getApp, getApps, initializeApp } from 'firebase/app';
 import {
-  Auth,
   browserLocalPersistence,
   getAuth,
-  initializeAuth,
   setPersistence,
+  type Auth,
 } from 'firebase/auth';
+import { Firestore, getFirestore } from 'firebase/firestore';
 import { Platform } from 'react-native';
-
 
 const firebaseConfig = {
   apiKey: 'AIzaSyAS3d3T9sENBlWoop-edE_xv017wpvUqxE',
@@ -19,24 +19,36 @@ const firebaseConfig = {
   appId: '126163217001',
 };
 
-const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+export const app: FirebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
 let auth: Auth;
 
+console.log('[FB] Platform:', Platform.OS);
+
 if (Platform.OS === 'web') {
-  // Web: persistência no browser
+  console.log('[FB] Using browserLocalPersistence');
+
   auth = getAuth(app);
   setPersistence(auth, browserLocalPersistence).catch(() => {});
 } else {
-  // RN (Android/iOS): initializeAuth + AsyncStorage (IMPORT CONDICIONAL!)
   try {
-    const { getReactNativePersistence } = require('firebase/auth/react-native');
-    auth = initializeAuth(app, {
-      persistence: getReactNativePersistence(AsyncStorage),
-    });
+    const { getReactNativePersistence, initializeAuth } = require('firebase/auth');
+    console.log('[FB] Using initializeAuth + AsyncStorage');
+    try {
+      auth = initializeAuth(app, {
+        persistence: getReactNativePersistence(AsyncStorage),
+      });
+      console.log('[FB] Auth initialized with AsyncStorage persistence');
+    } catch (error) {
+      console.error('[FB] Error initializing auth with AsyncStorage:', error);
+    }
   } catch {
     auth = getAuth(app);
+    console.log('[FB] Using fallback: no native persistence');
   }
 }
 
-export { app, auth };
+const db: Firestore = getFirestore(app);
+
+export { auth, db };
+

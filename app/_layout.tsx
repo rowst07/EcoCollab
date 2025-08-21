@@ -3,6 +3,13 @@ import { useProtectedRoute } from '@/hooks/useProtectedRoute';
 import { AuthProvider, useAuth } from '@/services/AuthContext';
 import { Stack, usePathname } from 'expo-router';
 
+export default function RootLayout() {
+  return (
+    <AuthProvider>
+      <Layout />
+    </AuthProvider>
+  );
+}
 
 function Layout() {
   const pathname = usePathname();
@@ -29,10 +36,4 @@ function Layout() {
   );
 }
 
-export default function RootLayout() {
-  return (
-    <AuthProvider>
-      <Layout />
-    </AuthProvider>
-  );
-}
+
