@@ -1,5 +1,5 @@
 import { Stack, usePathname } from 'expo-router';
-import BottomNavbar from '../components/BottomNavbar';
+import BottomNavbar from '../components/bottomNavbar';
 
 export default function Layout() {
   const pathname = usePathname();
