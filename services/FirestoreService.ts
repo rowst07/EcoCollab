@@ -1,3 +1,4 @@
+// services/FirestoreService.ts
 import { User } from 'firebase/auth';
 import {
   addDoc,
@@ -5,23 +6,29 @@ import {
   doc,
   GeoPoint,
   getDoc,
+  getDocs,
+  // 🔽 novos imports para queries/listeners
+  onSnapshot,
+  orderBy,
+  query,
   serverTimestamp,
   setDoc,
-  updateDoc
+  updateDoc,
+  where,
+  type Unsubscribe,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
-import { onSnapshot, type Unsubscribe } from 'firebase/firestore';
-
 export type Role = 'user' | 'moderator' | 'admin';
 
-// Documento mínimo criado no registo
+// ===================== USERS =====================
+
 export type UserMinimalDoc = {
   id: string;                 // uid
-  nome: string;               // display name inserido no formulário
-  email: string;              // email do formulário
-  morada: string;             // endereço textual (ex.: "Rua X, Guimarães")
-  role: Role;                 // valor vindo do formulário (recomendado: 'user')
+  nome: string;               // display name
+  email: string;              // email
+  morada: string;             // endereço textual
+  role: Role;                 // 'user' | 'moderator' | 'admin'
   dataCriacao: any;           // serverTimestamp()
   dataAtualizacao: any;       // serverTimestamp()
 };
@@ -30,11 +37,7 @@ export function userRef(uid: string) {
   return doc(collection(db, 'users'), uid);
 }
 
-/**
- * Cria (ou sobrescreve com merge) o documento mínimo do utilizador em /users/{uid}.
- * - Escreve APENAS os campos fornecidos (mais timestamps do servidor).
- * - Idempotente: se correr duas vezes, mantém dados e atualiza dataAtualizacao.
- */
+/** Cria/sobrescreve (merge) doc mínimo do utilizador. */
 export async function createUserDocumentStrict(
   u: User,
   data: { nome: string; email: string; morada: string; role: Role }
@@ -58,7 +61,7 @@ export async function userDocumentExists(uid: string): Promise<boolean> {
   return snap.exists();
 }
 
-/** Atualiza apenas campos permitidos no perfil mínimo + dataAtualizacao. */
+/** Atualiza perfil mínimo permitido. */
 export async function updateUserMinimalDoc(
   uid: string,
   data: Partial<Pick<UserMinimalDoc, 'nome' | 'email' | 'morada'>>
@@ -78,7 +81,7 @@ export type UserExtras = {
   dataNasc?: string;
 };
 
-/** Atualiza campos “extras” do perfil + dataAtualizacao (NÃO mexe em role/id/dataCriacao). */
+/** Atualiza campos “extras” do perfil (sem mexer em role/id/dataCriacao). */
 export async function updateUserExtrasDoc(uid: string, extras: UserExtras) {
   await updateDoc(userRef(uid), {
     ...extras,
@@ -96,6 +99,7 @@ export function subscribeUserDoc(
   });
 }
 
+// ===================== PONTOS DE RECOLHA =====================
 
 export type PontoRecolhaStatus = 'pendente' | 'aprovado' | 'reprovado';
 
@@ -111,8 +115,15 @@ export type PontoRecolhaCreate = {
   status: PontoRecolhaStatus; // "pendente" na criação
 };
 
+export type PontoRecolhaDoc = PontoRecolhaCreate & {
+  id: string;
+  dataCriacao?: any;
+  dataAtualizacao?: any;
+};
+
 const pontoRecolhaCol = collection(db, 'pontoRecolha');
 
+/** Create */
 export async function addPontoRecolha(data: PontoRecolhaCreate): Promise<string> {
   const docRef = await addDoc(pontoRecolhaCol, {
     ...data,
@@ -120,4 +131,80 @@ export async function addPontoRecolha(data: PontoRecolhaCreate): Promise<string>
     dataAtualizacao: serverTimestamp(),
   });
   return docRef.id;
+}
+
+/** Shape usado pelo ecrã do mapa (HomeUser) */
+export type PontoMarker = {
+  id: string;
+  nome: string;
+  tipos: string[];         // mapeado de 'residuos'
+  latitude: number;
+  longitude: number;
+  classificacao?: number;  // opcional (se vieres a ter ratings)
+  morada?: string;         // mapeado de 'endereco'
+  descricao?: string;
+  fotoUrl?: string | null;
+  status: PontoRecolhaStatus;
+};
+
+/** Converte documento Firestore -> shape para o mapa */
+export function mapPontoToMarker(d: PontoRecolhaDoc): PontoMarker | null {
+  if (!d?.localizacao) return null;
+  return {
+    id: d.id,
+    nome: d.nome,
+    tipos: Array.isArray(d.residuos) ? d.residuos : [],
+    latitude: d.localizacao.latitude,
+    longitude: d.localizacao.longitude,
+    classificacao: undefined, // se adicionares avaliação, preenche aqui
+    morada: d.endereco,
+    descricao: d.descricao,
+    fotoUrl: d.fotoUrl ?? null,
+    status: d.status,
+  };
+}
+
+/** Subscrição em tempo-real aos pontos (com filtro por status) */
+export function subscribePontosRecolha(args: {
+  statusEq?: PontoRecolhaStatus;
+  statusIn?: PontoRecolhaStatus[];   // máx 10 valores
+  onData: (markers: PontoMarker[]) => void;
+}): Unsubscribe {
+  const { statusEq, statusIn, onData } = args;
+
+  let q = query(pontoRecolhaCol);
+  if (statusEq) q = query(q, where('status', '==', statusEq));
+  if (statusIn && statusIn.length > 0) q = query(q, where('status', 'in', statusIn));
+  // opcional: ordenação por data
+  q = query(q, orderBy('dataCriacao', 'desc'));
+
+  return onSnapshot(q, (snap) => {
+    const list: PontoMarker[] = [];
+    snap.forEach((docSnap) => {
+      const raw = { id: docSnap.id, ...(docSnap.data() as any) } as PontoRecolhaDoc;
+      const marker = mapPontoToMarker(raw);
+      if (marker) list.push(marker);
+    });
+    onData(list);
+  });
+}
+
+/** Consulta única (sem tempo-real), caso precises */
+export async function fetchPontosRecolha(params?: {
+  statusEq?: PontoRecolhaStatus;
+  statusIn?: PontoRecolhaStatus[];
+}): Promise<PontoMarker[]> {
+  let q = query(pontoRecolhaCol);
+  if (params?.statusEq) q = query(q, where('status', '==', params.statusEq));
+  if (params?.statusIn?.length) q = query(q, where('status', 'in', params.statusIn));
+  q = query(q, orderBy('dataCriacao', 'desc'));
+
+  const snap = await getDocs(q);
+  const list: PontoMarker[] = [];
+  snap.forEach((docSnap) => {
+    const raw = { id: docSnap.id, ...(docSnap.data() as any) } as PontoRecolhaDoc;
+    const marker = mapPontoToMarker(raw);
+    if (marker) list.push(marker);
+  });
+  return list;
 }

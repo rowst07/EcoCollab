@@ -5,6 +5,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import MapView, { Callout, Marker } from 'react-native-maps';
 
+// 🔥 serviço Firestore (novas funções abaixo)
+import { subscribePontosRecolha, type PontoMarker } from '@/services/FirestoreService';
+
 const cores: Record<string, string> = {
   papel: '#2196F3',
   plastico: '#FFEB3B',
@@ -18,7 +21,7 @@ const cores: Record<string, string> = {
 export default function HomeUser() {
   const router = useRouter();
 
-  const [ecopontos, setEcopontos] = useState<any[]>([]);
+  const [ecopontos, setEcopontos] = useState<PontoMarker[]>([]);
   const [pesquisaModal, setPesquisaModal] = useState(false);
   const [pesquisa, setPesquisa] = useState('');
   const [historico, setHistorico] = useState<string[]>([]);
@@ -32,30 +35,14 @@ export default function HomeUser() {
     classificacao: 'todos'
   });
 
+  // 📡 Subscrição Firestore (tempo-real)
   useEffect(() => {
-    // Podes ter "tipo" (string) OU "tipos" (array).
-    setEcopontos([
-      {
-        id: 1,
-        nome: 'Ecoponto Vidro Centro',
-        tipo: 'vidro',
-        classificacao: 4,
-        latitude: 41.805,
-        longitude: -6.756,
-        morada: 'Centro, Bragança',
-        descricao: 'Contentor de vidro perto do centro.'
-      },
-      {
-        id: 2,
-        nome: 'Ecoponto Escola',
-        tipos: ['papel', 'plastico', 'metal'],
-        classificacao: 3,
-        latitude: 41.808,
-        longitude: -6.754,
-        morada: 'Junto à Escola X',
-        descricao: 'Vários contentores na escola.'
-      },
-    ]);
+    // Por omissão: só "aprovado". Para incluir "pendente", troca para { statusIn: ['aprovado','pendente'] }
+    const unsub = subscribePontosRecolha({
+      statusEq: 'aprovado',
+      onData: setEcopontos,
+    });
+    return () => unsub();
   }, []);
 
   const aplicarPesquisa = () => {
@@ -68,36 +55,37 @@ export default function HomeUser() {
   const filtrados = useMemo(() => {
     return ecopontos.filter(e => {
       const nomeOk = e.nome.toLowerCase().includes(pesquisa.toLowerCase());
-      const tipos = Array.isArray(e.tipos) ? e.tipos : [e.tipo ?? 'outros'];
+      const tipos = e.tipos?.length ? e.tipos : ['outros'];
       const algumTipoAtivo = tipos.some((t: string) => (filtros as any)[t] === true);
-      const classOk = filtros.classificacao === 'todos' || e.classificacao >= Number(filtros.classificacao);
+      const classOk = filtros.classificacao === 'todos' || (e.classificacao ?? 0) >= Number(filtros.classificacao);
       return nomeOk && algumTipoAtivo && classOk;
     });
   }, [ecopontos, pesquisa, filtros]);
 
-  const abrirDetalhes = (eco: any) => {
+  const abrirDetalhes = (eco: PontoMarker) => {
     router.push(`/UserScreens/detalhesEcoponto?id=${eco.id}`);
   };
 
-  const renderCirculosTipos = (eco: any) => {
-    const tipos = Array.isArray(eco.tipos) ? eco.tipos : [eco.tipo ?? 'outros'];
+  const renderCirculosTipos = (eco: PontoMarker) => {
+    const tipos = eco.tipos?.length ? eco.tipos : ['outros'];
     return (
       <View style={styles.circulosRow}>
-        {tipos.map((t: string, idx: number) => (
+        {tipos.map((t, idx) => (
           <View key={idx} style={[styles.circulo, { backgroundColor: cores[t] || cores.outros }]} />
         ))}
       </View>
     );
   };
 
-  const renderEstrelas = (n: number) => {
+  const renderEstrelas = (n: number | undefined) => {
+    const score = Math.max(0, Math.min(5, Math.floor(n ?? 0)));
     const arr = [1, 2, 3, 4, 5];
     return (
       <View style={styles.estrelasRow}>
         {arr.map(i => (
           <Ionicons
             key={i}
-            name={i <= n ? 'star' : 'star-outline'}
+            name={i <= score ? 'star' : 'star-outline'}
             size={16}
             color="#FFA000"
           />
@@ -141,10 +129,10 @@ export default function HomeUser() {
                 {/* Resíduos (círculos coloridos) */}
                 {renderCirculosTipos(e)}
 
-                {/* Classificação */}
+                {/* Classificação (se não tiver, mostra 0) */}
                 <View style={styles.classRow}>
                   {renderEstrelas(e.classificacao)}
-                  <Text style={styles.classText}>{e.classificacao}.0</Text>
+                  <Text style={styles.classText}>{(e.classificacao ?? 0).toFixed(1)}</Text>
                 </View>
 
                 {/* “Botão” visual (sem onPress) */}
@@ -160,11 +148,15 @@ export default function HomeUser() {
       </MapView>
 
       {/* Botão flutuante para criar novo ponto */}
-      <TouchableOpacity style={styles.fab} onPress={() => router.push('/UserScreens/criarEcoponto')}>
+      <TouchableOpacity
+        style={styles.fab}
+        // caminho do teu ecrã de criação: está em SharedScreens
+        onPress={() => router.push('/UserScreens/criarEcoponto')}
+      >
         <Ionicons name="add" size={28} color="#fff" />
       </TouchableOpacity>
 
-      {/* Botão “Painel de Moderador” (por agora visível para todos) */}
+      {/* Botão “Painel de Moderador” */}
       <TouchableOpacity
         style={styles.modBtn}
         onPress={() => router.push('/ModScreens')}
