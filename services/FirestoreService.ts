@@ -6,7 +6,6 @@ import {
   doc,
   GeoPoint,
   getDoc,
-  getDocs,
   // 🔽 novos imports para queries/listeners
   onSnapshot,
   orderBy,
@@ -15,7 +14,7 @@ import {
   setDoc,
   updateDoc,
   where,
-  type Unsubscribe,
+  type Unsubscribe
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -189,22 +188,24 @@ export function subscribePontosRecolha(args: {
   });
 }
 
-/** Consulta única (sem tempo-real), caso precises */
-export async function fetchPontosRecolha(params?: {
-  statusEq?: PontoRecolhaStatus;
-  statusIn?: PontoRecolhaStatus[];
-}): Promise<PontoMarker[]> {
-  let q = query(pontoRecolhaCol);
-  if (params?.statusEq) q = query(q, where('status', '==', params.statusEq));
-  if (params?.statusIn?.length) q = query(q, where('status', 'in', params.statusIn));
-  q = query(q, orderBy('dataCriacao', 'desc'));
+/** Lê uma única vez um ponto por ID e mapeia para o shape do mapa */
+export async function getPontoRecolhaById(id: string): Promise<PontoMarker | null> {
+  const dref = doc(pontoRecolhaCol, id);
+  const snap = await getDoc(dref);
+  if (!snap.exists()) return null;
+  const raw = { id: snap.id, ...(snap.data() as any) } as PontoRecolhaDoc;
+  return mapPontoToMarker(raw);
+}
 
-  const snap = await getDocs(q);
-  const list: PontoMarker[] = [];
-  snap.forEach((docSnap) => {
-    const raw = { id: docSnap.id, ...(docSnap.data() as any) } as PontoRecolhaDoc;
-    const marker = mapPontoToMarker(raw);
-    if (marker) list.push(marker);
+/** Subscreve em tempo-real a um ponto por ID (detalhes) */
+export function subscribePontoRecolhaById(
+  id: string,
+  cb: (ponto: PontoMarker | null) => void
+): Unsubscribe {
+  const dref = doc(pontoRecolhaCol, id);
+  return onSnapshot(dref, (snap) => {
+    if (!snap.exists()) return cb(null);
+    const raw = { id: snap.id, ...(snap.data() as any) } as PontoRecolhaDoc;
+    cb(mapPontoToMarker(raw));
   });
-  return list;
 }

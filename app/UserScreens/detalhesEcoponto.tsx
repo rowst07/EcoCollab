@@ -3,8 +3,9 @@ import { BRAND, RESIDUE_COLORS } from '@/constants/Colors';
 import { useTheme, useThemeColor } from '@/hooks/useThemeColor';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Dimensions,
   Image,
   Linking,
@@ -16,25 +17,13 @@ import {
   View
 } from 'react-native';
 
-type Ecoponto = {
-  id: number;
-  nome: string;
-  morada: string;
-  tipos: string[];
-  classificacao: number; // 0-5
-  latitude: number;
-  longitude: number;
-};
-
-// ⚠️ MOCK: troca por fetch a API/estado global
-const MOCK: Ecoponto[] = [
-  { id: 1, nome: 'Ecoponto Vidro Centro', morada: 'Centro, Bragança', tipos: ['vidro'], classificacao: 4, latitude: 41.805, longitude: -6.756 },
-  { id: 2, nome: 'Ecoponto Escola',       morada: 'Junto à Escola X',  tipos: ['papel','plastico','metal'], classificacao: 3, latitude: 41.808, longitude: -6.754 },
-];
+// 🔥 Firestore
+import { subscribePontoRecolhaById, type PontoMarker } from '@/services/FirestoreService';
 
 export default function DetalhesEcoponto() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
+  const pontoId = Array.isArray(id) ? id[0] : id; // id vem como string
 
   // Tema
   const t = useTheme();
@@ -44,21 +33,25 @@ export default function DetalhesEcoponto() {
   const card = useThemeColor('card');
   const bg = useThemeColor('bg');
 
-  const ecoponto = useMemo<Ecoponto>(() => {
-    const nId = Number(id);
-    return MOCK.find((e) => e.id === nId) ?? MOCK[0];
-  }, [id]);
+  const [eco, setEco] = useState<PontoMarker | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // subscrição em tempo real ao documento
+  useEffect(() => {
+    if (!pontoId) return;
+    const unsub = subscribePontoRecolhaById(pontoId, (p) => {
+      setEco(p);
+      setLoading(false);
+    });
+    return () => unsub();
+  }, [pontoId]);
 
   const width = Dimensions.get('window').width;
   const height = Math.round(width * 9 / 16);
 
-  const API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY as string | undefined;
-  const streetViewUrl = API_KEY
-    ? `https://maps.googleapis.com/maps/api/streetview?size=${Math.min(width, 1200)}x${Math.min(height, 800)}&location=${ecoponto.latitude},${ecoponto.longitude}&fov=80&pitch=0&key=${API_KEY}`
-    : null;
-
   const abrirNavegacao = () => {
-    const { latitude: lat, longitude: lng, nome } = ecoponto;
+    if (!eco?.latitude || !eco.longitude) return;
+    const { latitude: lat, longitude: lng, nome } = eco;
     const label = encodeURIComponent(nome);
     if (Platform.OS === 'ios') {
       Linking.openURL(`http://maps.apple.com/?daddr=${lat},${lng}&q=${label}`);
@@ -67,18 +60,61 @@ export default function DetalhesEcoponto() {
     }
   };
 
-  const renderEstrelas = (n: number) => (
-    <View style={{ flexDirection: 'row' }}>
-      {[1,2,3,4,5].map(i => (
-        <Ionicons
-          key={i}
-          name={i <= n ? 'star' : 'star-outline'}
-          size={26}
-          color={BRAND.star}
-        />
-      ))}
-    </View>
-  );
+  const renderEstrelas = (n?: number) => {
+    const val = Math.max(0, Math.min(5, Math.floor(n ?? 0)));
+    return (
+      <View style={{ flexDirection: 'row' }}>
+        {[1, 2, 3, 4, 5].map((i) => (
+          <Ionicons
+            key={i}
+            name={i <= val ? 'star' : 'star-outline'}
+            size={26}
+            color={BRAND.star}
+          />
+        ))}
+      </View>
+    );
+  };
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: bg }}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={28} color="#fff" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Detalhes do Ecoponto</Text>
+          <View style={{ width: 28 }} />
+        </View>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator />
+          <Text style={{ color: muted, marginTop: 10 }}>A carregar…</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (!eco) {
+    return (
+      <View style={{ flex: 1, backgroundColor: bg }}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={28} color="#fff" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Detalhes do Ecoponto</Text>
+          <View style={{ width: 28 }} />
+        </View>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <Ionicons name="alert-circle" size={32} color={muted} />
+          <Text style={{ color: muted, marginTop: 8, textAlign: 'center' }}>
+            Não foi possível encontrar este ecoponto.
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  const tipos = eco.tipos?.length ? eco.tipos : ['outros'];
 
   return (
     <View style={{ flex: 1, backgroundColor: bg }}>
@@ -92,26 +128,31 @@ export default function DetalhesEcoponto() {
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
-        {/* Street View full width */}
-        {streetViewUrl ? (
-          <Image source={{ uri: streetViewUrl }} style={{ width, height }} resizeMode="cover" />
+        {/* Foto do ponto ou placeholder */}
+        {eco.fotoUrl ? (
+          <Image source={{ uri: eco.fotoUrl }} style={{ width, height }} resizeMode="cover" />
         ) : (
           <View style={[styles.placeholder, { width, height, borderColor: border, backgroundColor: card }]}>
             <Ionicons name="image" size={32} color={muted} />
-            <Text style={{ color: muted, marginTop: 6 }}>Street View não disponível</Text>
+            <Text style={{ color: muted, marginTop: 6 }}>
+              Ponto de Recolha sem foto
+            </Text>
           </View>
         )}
 
         {/* Conteúdo */}
         <View style={[styles.content]}>
           {/* Título centrado e morada */}
-          <Text style={[styles.nome, { color: text }]}>{ecoponto.nome}</Text>
-          <Text style={[styles.morada, { color: muted }]}>{ecoponto.morada}</Text>
+          <Text style={[styles.nome, { color: text }]}>{eco.nome}</Text>
+          {!!eco.morada && <Text style={[styles.morada, { color: muted }]}>{eco.morada}</Text>}
+          {!!eco.descricao && (
+            <Text style={[{ color: text, marginBottom: 16 }]}>{eco.descricao}</Text>
+          )}
 
           {/* Resíduos aceites */}
           <Text style={[styles.subTitle, { color: text }]}>Tipos de resíduos aceites</Text>
           <View style={styles.tiposWrap}>
-            {ecoponto.tipos.map((tpo: string, idx: number) => (
+            {tipos.map((tpo: string, idx: number) => (
               <View
                 key={idx}
                 style={[
@@ -125,18 +166,21 @@ export default function DetalhesEcoponto() {
             ))}
           </View>
 
-          {/* Classificação (maior) */}
+          {/* Classificação (placeholder) */}
           <Text style={[styles.subTitle, { color: text }]}>Classificação</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 24 }}>
-            {renderEstrelas(ecoponto.classificacao)}
-            <Text style={[styles.classText, { color: text }]}>{ecoponto.classificacao}.0</Text>
+            {renderEstrelas(eco.classificacao)}
+            <Text style={[styles.classText, { color: text }]}>
+              {(eco.classificacao ?? 0).toFixed(1)}
+            </Text>
           </View>
 
-          {/* Ações (mesmas dimensões, empilhadas) */}
+          {/* Ações */}
           <View style={styles.actionsCol}>
             <TouchableOpacity
               style={[styles.actionBtn, { backgroundColor: BRAND.primary }]}
               onPress={abrirNavegacao}
+              disabled={eco.latitude == null || eco.longitude == null}
             >
               <Ionicons name="navigate" size={20} color="#fff" />
               <Text style={styles.actionBtnText}>Ir para o local</Text>
@@ -144,7 +188,7 @@ export default function DetalhesEcoponto() {
 
             <TouchableOpacity
               style={[styles.actionBtn, { backgroundColor: BRAND.danger }]}
-              onPress={() => router.push(`/UserScreens/report?id=${ecoponto.id}`)}
+              onPress={() => router.push(`/UserScreens/report?id=${eco.id}`)}
             >
               <Ionicons name="alert-circle" size={20} color="#fff" />
               <Text style={styles.actionBtnText}>Reportar problema</Text>
@@ -191,7 +235,7 @@ const styles = StyleSheet.create({
   morada: {
     fontSize: 16,
     textAlign: 'center',
-    marginBottom: 18
+    marginBottom: 12
   },
   subTitle: {
     fontSize: 18,
