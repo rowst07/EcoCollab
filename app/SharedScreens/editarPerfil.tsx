@@ -6,6 +6,7 @@ import {
   updateUserMinimalDoc,
   userRef,
 } from '@/services/FirestoreService';
+import { CLOUDINARY_UPLOAD_PRESET, uploadToCloudinary } from '@/services/uploadCloudinary';
 import { Feather } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
@@ -29,6 +30,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+
 
 type ProfileData = {
   name: string;
@@ -59,6 +61,7 @@ export default function EditarPerfil() {
     }),
     [user?.displayName, user?.email]
   );
+  
 
   const [form, setForm] = useState<ProfileData>(initial);
   const [original, setOriginal] = useState<ProfileData>(initial);
@@ -178,6 +181,26 @@ export default function EditarPerfil() {
     try {
       setSaving(true);
 
+      // 0) Se a foto for local (file://), faz upload para Cloudinary e substitui no form
+      let cloudUrl: string | undefined;
+      let cloudPublicId: string | undefined;
+
+      const isLocalFile =
+        !!form.photoUri && !/^https?:\/\//i.test(form.photoUri) && /^file:\/\//i.test(form.photoUri);
+
+      if (isLocalFile) {
+        const res = await uploadToCloudinary(form.photoUri!, {
+          folder: `users/${user.uid}`,
+          uploadPreset: CLOUDINARY_UPLOAD_PRESET,
+          publicId: 'avatar',                     // mantém o mesmo “nome” entre uploads
+          tags: ['user', user.uid],
+          context: { owner: user.uid },
+          contentType: 'image/jpeg',
+        });
+        cloudUrl = res.secure_url;
+        cloudPublicId = res.public_id;
+      }
+
       // 1) Atualiza mínimos (nome, morada) — NÃO mexe no email aqui
       await updateUserMinimalDoc(user.uid, {
         nome: form.name.trim(),
@@ -185,21 +208,34 @@ export default function EditarPerfil() {
       });
 
       // 2) Atualiza extras diretamente no doc
-      //    - se o campo ficar vazio, removemos (deleteField) para manter o doc limpo
       const extrasUpdate: Record<string, any> = {
         dataAtualizacao: serverTimestamp(),
       };
+
+      // telemóvel / birthdate: remove se vazio
       extrasUpdate.telemovel = form.phone.trim() ? form.phone.trim() : deleteField();
       extrasUpdate.birthdate = form.birthdate.trim() ? form.birthdate.trim() : deleteField();
-      // Se photoUri for URL remoto, persiste; se for local (file://), não persiste (opcional)
-      if (form.photoUri && /^https?:\/\//i.test(form.photoUri)) {
+
+      // foto:
+      if (cloudUrl && cloudPublicId) {
+        // acabou de fazer upload
+        extrasUpdate.fotoURL = cloudUrl;
+        extrasUpdate.fotoId = cloudPublicId;
+        // atualiza estado local para refletir URL remoto
+        onChange('photoUri', cloudUrl);
+      } else if (form.photoUri && /^https?:\/\//i.test(form.photoUri)) {
+        // já era URL remoto (mantém)
         extrasUpdate.fotoURL = form.photoUri;
+        // não sabemos o public_id se não tiveres guardado antes (opcional)
       } else if (!form.photoUri) {
+        // remover foto
         extrasUpdate.fotoURL = deleteField();
+        extrasUpdate.fotoId = deleteField();
       }
+
       await updateDoc(userRef(user.uid), extrasUpdate);
 
-      setOriginal(form);
+      setOriginal({ ...form, photoUri: cloudUrl ?? form.photoUri });
       Alert.alert('Sucesso', 'Perfil atualizado!', [{ text: 'OK', onPress: () => router.back() }]);
     } catch (e: any) {
       Alert.alert('Erro', e?.message ?? 'Não foi possível atualizar.');
