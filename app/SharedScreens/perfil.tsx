@@ -1,4 +1,5 @@
 // app/SharedScreens/Perfil.tsx
+import { useUserDoc } from '@/hooks/useUserDoc';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
@@ -17,6 +18,13 @@ export default function Perfil() {
   const router = useRouter();
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const T = THEME[scheme];
+  const { userDoc, loading } = useUserDoc();
+
+  const ROLE_LABELS: Record<string, string> = {
+  user: 'Utilizador',
+  mod: 'Moderador',
+  admin: 'Administrador',
+};
 
   return (
     <View style={[styles.wrapper, { backgroundColor: T.bg }]}>
@@ -41,13 +49,19 @@ export default function Perfil() {
 
       {/* Avatar + Nome e Role */}
       <View style={styles.profileSection}>
-        <Image
-          source={require('../../assets/placeholder.png')}
-          style={[styles.avatar, { backgroundColor: T.card }]}
-        />
+        {userDoc?.fotoURL ? (
+          <Image
+            source={{ uri: userDoc.fotoURL }}
+            style={[styles.avatar, { backgroundColor: T.card }]}
+          />
+        ) : (
+          <View style={[styles.avatar, { backgroundColor: T.card, alignItems: 'center', justifyContent: 'center' }]}> 
+            <Feather name="user" size={48} color={T.textMuted} />
+          </View>
+        )}
         <View style={styles.userInfo}>
-          <Text style={[styles.name, { color: T.text }]}>João Moutinho</Text>
-          <Text style={[styles.role, { color: T.textMuted }]}>Utilizador</Text>
+          <Text style={[styles.name, { color: T.text }]}>{userDoc?.nome}</Text>
+          <Text style={[styles.role, { color: T.textMuted }]}>{userDoc?.role ? ROLE_LABELS[userDoc.role] || userDoc.role : ''}</Text>
         </View>
       </View>
 

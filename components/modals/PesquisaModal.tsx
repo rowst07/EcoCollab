@@ -73,7 +73,17 @@ export default function PesquisaModal({
                 onPress={() => setFiltros(prev => ({ ...prev, classificacao: c }))}
                 style={[styles.filtroBtn, filtros.classificacao === c && styles.filtroAtivo]}
               >
-                <Text style={{ color: colors.text }}>{c === 'todos' ? 'Todos' : `>= ${c} estrelas`}</Text>
+                {filtros.classificacao === c ? (
+                  <Text style={{ color: colors.text }}>{c === 'todos' ? 'Todos' : `>= ${c} estrelas`}</Text>
+                ) : (
+                  c === 'todos' ? (
+                    <Text style={{ color: colors.text }}>Todos</Text>
+                  ) : (
+                    <Text style={{ color: colors.bg }}>
+                      {Array.from({ length: Number(c) }, (_, i) => '★').join('')}
+                    </Text>
+                  )
+                )}
               </TouchableOpacity>
             ))}
           </View>

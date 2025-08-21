@@ -1,3 +1,4 @@
+import { useAuth } from '@/services/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
@@ -17,6 +18,7 @@ import { useTheme, useThemeColor } from '@/hooks/useThemeColor';
 
 export default function Definicoes() {
   const router = useRouter();
+  const { signOutApp } = useAuth();
 
   // Tema atual
   const t = useTheme();
@@ -51,7 +53,15 @@ export default function Definicoes() {
   const terminarSessao = () => {
     Alert.alert('Terminar sessão', 'Tens a certeza que queres terminar sessão?', [
       { text: 'Cancelar', style: 'cancel' },
-      { text: 'Terminar', style: 'destructive', onPress: () => router.push('/SharedScreens/login') }
+      { text: 'Terminar', style: 'destructive', onPress: async () => {
+          try {
+            await signOutApp();
+            router.replace('/SharedScreens/login');
+          } catch (e) {
+            Alert.alert('Erro', 'Não foi possível terminar sessão.');
+          }
+        }
+      }
     ]);
   };
 

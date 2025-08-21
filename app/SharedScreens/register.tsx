@@ -1,7 +1,10 @@
+import { useAuth } from '@/services/AuthContext';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import React, { useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -15,6 +18,8 @@ import {
 
 export default function Register() {
   const router = useRouter();
+  const { signUp } = useAuth();
+  const [loading, setLoading] = useState(false);
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -148,8 +153,51 @@ export default function Register() {
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.button}>
-            <Text style={styles.buttonText}>Criar Conta</Text>
+          <TouchableOpacity
+            style={[styles.button, !termsAccepted && { backgroundColor: '#ccc' }]}
+            disabled={!termsAccepted || loading}
+            onPress={async () => {
+              const name = [firstName, lastName].filter(Boolean).join(' ').trim();
+              const mail = email.trim();
+
+              if (!name) { Alert.alert('Nome em falta', 'Indique nome e apelido.'); return; }
+              if (!mail || !password || !confirmPassword) {
+                Alert.alert('Campos obrigatórios', 'Preencha email e ambas as palavras‑passe.');
+                return;
+              }
+              if (!/^\S+@\S+\.\S+$/.test(mail)) {
+                Alert.alert('Email inválido', 'Indique um email válido.');
+                return;
+              }
+              if (password.length < 6) {
+                Alert.alert('Palavra‑passe fraca', 'Mínimo 6 caracteres.');
+                return;
+              }
+              if (password !== confirmPassword) {
+                Alert.alert('Palavra‑passe', 'As palavras‑passe não coincidem.');
+                return;
+              }
+              if (!termsAccepted) {
+                Alert.alert('Termos', 'Tem de aceitar os termos para continuar.');
+                return;
+              }
+
+              try {
+                setLoading(true);
+                await signUp(name, email, password, address, 'user');
+                Alert.alert('Conta criada', 'Faça login para continuar.');
+                router.replace('/SharedScreens/login'); // ← vai para o Login
+              } catch (error: any) {
+                Alert.alert('Erro ao criar conta', error?.message ?? 'Tente novamente.');
+              } finally {
+                setLoading(false);
+              }
+          }}>
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.buttonText}>Criar Conta</Text>
+            )}
           </TouchableOpacity>
         </View>
       </ScrollView>

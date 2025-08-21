@@ -1,71 +1,137 @@
 // app/SharedScreens/editarPerfil.tsx
 import { BRAND, THEME } from '@/constants/Colors';
+import { useAuth } from '@/services/AuthContext';
+import {
+  getUserMinimalDoc,
+  updateUserMinimalDoc,
+  userRef,
+} from '@/services/FirestoreService';
 import { Feather } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useMemo, useState } from 'react';
 import {
-    Alert,
-    Image,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  deleteField,
+  serverTimestamp,
+  updateDoc,
+} from 'firebase/firestore';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 type ProfileData = {
   name: string;
-  email: string;
+  email: string;       // inalterável aqui
   address: string;
-  phone: string;
-  birthdate: string; // YYYY-MM-DD
-  photoUri?: string | null;
+  phone: string;       // telemóvel (opcional)
+  birthdate: string;   // YYYY-MM-DD (opcional)
+  photoUri?: string | null; // usa URL remoto se já tiveres; local não persiste
 };
 
 export default function EditarPerfil() {
   const router = useRouter();
+  const { user } = useAuth(); // auth user
   // Força tema dark neste ecrã (fundo todo preto)
   const T = THEME.dark;
   const TEXT_ON_INPUT = THEME.light.text;        // #111111
   const PLACEHOLDER_ON_INPUT = THEME.light.textMuted; // #666666
 
-  const current: ProfileData = useMemo(
+  // Estado inicial (placeholder enquanto carrega Firestore)
+  const initial: ProfileData = useMemo(
     () => ({
-      name: 'João Moutinho',
-      email: 'joao@example.com',
-      address: 'Rua das Flores 123, 4800-000 Guimarães',
-      phone: '912345678',
-      birthdate: '1995-06-20',
+      name: user?.displayName ?? '',
+      email: user?.email ?? '',
+      address: '',
+      phone: '',
+      birthdate: '',
       photoUri: undefined,
     }),
-    []
+    [user?.displayName, user?.email]
   );
 
-  const [form, setForm] = useState<ProfileData>(current);
+  const [form, setForm] = useState<ProfileData>(initial);
+  const [original, setOriginal] = useState<ProfileData>(initial);
   const [saving, setSaving] = useState(false);
+  const [loadingDoc, setLoadingDoc] = useState(true);
 
   // ---- DatePicker modal state ----
   const [showDOB, setShowDOB] = useState(false);
-  const [tempDOB, setTempDOB] = useState<Date>(parseISO(current.birthdate));
+  const [tempDOB, setTempDOB] = useState<Date>(new Date(1990, 0, 1));
 
-  const changed = JSON.stringify(form) !== JSON.stringify(current);
+  // Carrega doc do Firestore
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      if (!user?.uid) {
+        setLoadingDoc(false);
+        return;
+      }
+      try {
+        const doc = await getUserMinimalDoc(user.uid); // { id, nome, email, morada, ... }
+        // Vamos buscar também extras diretamente ao snap para evitar alterar o serviço agora
+        // (telemovel, birthdate, fotoURL) — se não existirem, ficam vazios
+        const snap = await import('firebase/firestore').then(m =>
+          m.getDoc(userRef(user.uid))
+        );
+        const data: any = snap.exists() ? snap.data() : {};
+        const loaded: ProfileData = {
+          name: doc?.nome ?? user.displayName ?? '',
+          email: doc?.email ?? user.email ?? '',
+          address: doc?.morada ?? '',
+          phone: data?.telemovel ?? '',
+          birthdate: data?.birthdate ?? '',
+          photoUri: data?.fotoURL ?? undefined,
+        };
+        if (mounted) {
+          setForm(loaded);
+          setOriginal(loaded);
+          setTempDOB(loaded.birthdate ? parseISO(loaded.birthdate) : new Date(1990, 0, 1));
+        }
+      } catch (e) {
+        // fallback mínimo (usa Auth)
+        const fb: ProfileData = {
+          name: user?.displayName ?? '',
+          email: user?.email ?? '',
+          address: '',
+          phone: '',
+          birthdate: '',
+          photoUri: undefined,
+        };
+        if (mounted) {
+          setForm(fb);
+          setOriginal(fb);
+        }
+      } finally {
+        if (mounted) setLoadingDoc(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [user?.uid]);
+
+  const changed = JSON.stringify(form) !== JSON.stringify(original);
   const onChange = <K extends keyof ProfileData>(k: K, v: ProfileData[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
 
   const validate = useCallback(() => {
-    const emailOk = /^\S+@\S+\.\S+$/.test(form.email.trim());
-    const phoneOk = /^\d{9}$/.test(form.phone.trim());
+    const phoneOk = form.phone.trim() === '' || /^\d{9}$/.test(form.phone.trim());
     const birthOk =
       form.birthdate.trim() === '' ||
       /^\d{4}-\d{2}-\d{2}$/.test(form.birthdate.trim());
     const nameOk = form.name.trim().length >= 2;
-    return { ok: emailOk && phoneOk && birthOk && nameOk, emailOk, phoneOk, birthOk, nameOk };
+    return { ok: phoneOk && birthOk && nameOk, phoneOk, birthOk, nameOk };
   }, [form]);
 
   const pickImage = useCallback(async () => {
@@ -80,7 +146,7 @@ export default function EditarPerfil() {
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [1, 1],
-        quality: 0.8,
+        quality: 0.85,
       });
       if (!result.canceled) {
         const uri = result.assets?.[0]?.uri;
@@ -97,25 +163,50 @@ export default function EditarPerfil() {
   const removeImage = useCallback(() => onChange('photoUri', null), []);
 
   const handleSave = useCallback(async () => {
+    if (!user?.uid) return;
+
     const v = validate();
     if (!v.ok) {
       const msgs = [];
       if (!v.nameOk) msgs.push('• Nome (mín. 2 caracteres)');
-      if (!v.emailOk) msgs.push('• Email inválido');
-      if (!v.phoneOk) msgs.push('• Telefone: 9 dígitos PT');
-      if (!v.birthOk) msgs.push('• Data: YYYY-MM-DD');
+      if (!v.phoneOk) msgs.push('• Telefone: 9 dígitos PT (opcional)');
+      if (!v.birthOk) msgs.push('• Data: YYYY-MM-DD (opcional)');
       Alert.alert('Verifica os campos', msgs.join('\n'));
       return;
     }
+
     try {
       setSaving(true);
-      // TODO: integra com a tua API/estado
-      await new Promise((r) => setTimeout(r, 600));
+
+      // 1) Atualiza mínimos (nome, morada) — NÃO mexe no email aqui
+      await updateUserMinimalDoc(user.uid, {
+        nome: form.name.trim(),
+        morada: form.address.trim(),
+      });
+
+      // 2) Atualiza extras diretamente no doc
+      //    - se o campo ficar vazio, removemos (deleteField) para manter o doc limpo
+      const extrasUpdate: Record<string, any> = {
+        dataAtualizacao: serverTimestamp(),
+      };
+      extrasUpdate.telemovel = form.phone.trim() ? form.phone.trim() : deleteField();
+      extrasUpdate.birthdate = form.birthdate.trim() ? form.birthdate.trim() : deleteField();
+      // Se photoUri for URL remoto, persiste; se for local (file://), não persiste (opcional)
+      if (form.photoUri && /^https?:\/\//i.test(form.photoUri)) {
+        extrasUpdate.fotoURL = form.photoUri;
+      } else if (!form.photoUri) {
+        extrasUpdate.fotoURL = deleteField();
+      }
+      await updateDoc(userRef(user.uid), extrasUpdate);
+
+      setOriginal(form);
       Alert.alert('Sucesso', 'Perfil atualizado!', [{ text: 'OK', onPress: () => router.back() }]);
+    } catch (e: any) {
+      Alert.alert('Erro', e?.message ?? 'Não foi possível atualizar.');
     } finally {
       setSaving(false);
     }
-  }, [validate, router]);
+  }, [form, user?.uid, router, validate]);
 
   // ---- Handlers DatePicker ----
   const openDOBPicker = () => {
@@ -141,15 +232,15 @@ export default function EditarPerfil() {
             style={[
               styles.iconBtn,
               { backgroundColor: T.border },
-              !changed || saving ? styles.iconBtnDisabled : null,
+              (!changed || saving || loadingDoc) ? styles.iconBtnDisabled : null,
             ]}
             onPress={handleSave}
-            disabled={!changed || saving}
+            disabled={!changed || saving || loadingDoc}
           >
             <Feather
               name="check"
               size={22}
-              color={!changed || saving ? T.textMuted : BRAND.primary}
+              color={!changed || saving || loadingDoc ? T.textMuted : BRAND.primary}
             />
           </TouchableOpacity>
         </View>
@@ -157,7 +248,7 @@ export default function EditarPerfil() {
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'} // <- evita “barra” visual no Android
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
         <ScrollView
@@ -167,10 +258,16 @@ export default function EditarPerfil() {
         >
           {/* Avatar centrado */}
           <View style={styles.avatarBlock}>
-            <Image
-              source={form.photoUri ? { uri: form.photoUri } : require('../../assets/placeholder.png')}
-              style={[styles.avatar, { backgroundColor: T.input }]}
-            />
+            {form.photoUri ? (
+              <Image
+                source={{ uri: form.photoUri }}
+                style={[styles.avatar, { backgroundColor: T.card }]}
+              />
+            ) : (
+              <View style={[styles.avatar, { backgroundColor: T.card, alignItems: 'center', justifyContent: 'center' }]}>
+                <Feather name="user" size={48} color={T.textMuted} />
+              </View>
+            )}
             <View style={styles.avatarBtnsRow}>
               <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: BRAND.primary }]} onPress={pickImage}>
                 <Feather name="image" size={16} color={THEME.light.bg} />
@@ -195,17 +292,21 @@ export default function EditarPerfil() {
             textOnInput={TEXT_ON_INPUT}
             placeholderOnInput={PLACEHOLDER_ON_INPUT}
           />
+
+          {/* Email — INALTERÁVEL AQUI */}
           <Field
-            label="Email"
+            label="Email (não editável aqui)"
             value={form.email}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            onChangeText={(t) => onChange('email', t)}
+            onChangeText={() => {}}
             placeholder="nome@exemplo.com"
             theme={T}
             textOnInput={TEXT_ON_INPUT}
             placeholderOnInput={PLACEHOLDER_ON_INPUT}
+            keyboardType="email-address"
+            editable={false}
+            disabled
           />
+
           <Field
             label="Morada"
             value={form.address}
@@ -216,7 +317,7 @@ export default function EditarPerfil() {
             placeholderOnInput={PLACEHOLDER_ON_INPUT}
           />
           <Field
-            label="Telefone"
+            label="Telemóvel"
             value={form.phone}
             keyboardType="phone-pad"
             onChangeText={(t) => onChange('phone', t.replace(/[^\d]/g, '').slice(0, 9))}
@@ -244,7 +345,7 @@ export default function EditarPerfil() {
             </TouchableOpacity>
           </View>
 
-          {/* Modal do DatePicker: só fecha em OK/Cancelar */}
+          {/* Modal do DatePicker */}
           <Modal
             visible={showDOB}
             transparent
@@ -252,7 +353,7 @@ export default function EditarPerfil() {
             onRequestClose={cancelDOB}
           >
             <Pressable style={styles.modalBackdrop} onPress={cancelDOB} />
-            <View style={[styles.modalSheet, { backgroundColor: T.card }]}>
+            <View style={[styles.modalSheet, { backgroundColor: T.bg }]}>
               <Text style={[styles.modalTitle, { color: T.text }]}>Seleciona a data</Text>
               <DateTimePicker
                 value={tempDOB}
@@ -260,9 +361,8 @@ export default function EditarPerfil() {
                 display="spinner"
                 maximumDate={new Date()}
                 onChange={(_, d) => {
-                  if (d) setTempDOB(d); // não fecha ao mudar — só atualiza a temp
+                  if (d) setTempDOB(d);
                 }}
-                // spinner tem altura própria; no iOS escuro fica ok; no Android também
               />
               <View style={styles.modalActions}>
                 <TouchableOpacity style={[styles.modalBtn, { backgroundColor: BRAND.danger }]} onPress={cancelDOB}>
@@ -279,10 +379,10 @@ export default function EditarPerfil() {
             style={[
               styles.saveBtn,
               { backgroundColor: BRAND.primary },
-              !changed || saving ? { opacity: 0.6 } : null,
+              (!changed || saving || loadingDoc) ? { opacity: 0.6 } : null,
             ]}
             onPress={handleSave}
-            disabled={!changed || saving}
+            disabled={!changed || saving || loadingDoc}
           >
             <Feather name="check-circle" size={18} color={THEME.light.bg} />
             <Text style={[styles.saveBtnText, { color: THEME.light.bg }]}>
@@ -309,6 +409,8 @@ function Field(props: {
   theme: typeof THEME.dark;
   textOnInput: string;
   placeholderOnInput: string;
+  editable?: boolean;
+  disabled?: boolean;
 }) {
   const {
     label,
@@ -323,6 +425,8 @@ function Field(props: {
     theme,
     textOnInput,
     placeholderOnInput,
+    editable = true,
+    disabled = false,
   } = props;
 
   return (
@@ -332,8 +436,8 @@ function Field(props: {
         style={[
           styles.input,
           {
-            backgroundColor: theme.input,
-            color: textOnInput,
+            backgroundColor: editable ? theme.input : '#D8D8D8',
+            color: editable ? textOnInput : '#555',
             borderColor: theme.inputBorder,
           },
           multiline ? styles.inputMultiline : null,
@@ -347,7 +451,8 @@ function Field(props: {
         multiline={multiline}
         numberOfLines={numberOfLines}
         maxLength={maxLength}
-        keyboardAppearance="dark"   // iOS: teclado coerente com tema
+        editable={editable && !disabled}
+        keyboardAppearance="dark"
       />
     </View>
   );

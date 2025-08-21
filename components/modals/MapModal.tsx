@@ -1,8 +1,8 @@
-import React, { useRef } from 'react';
-import { Modal, View, Text, TouchableOpacity, StyleSheet, Platform, ActivityIndicator } from 'react-native';
-import MapView, { Marker, Region, MapPressEvent } from 'react-native-maps';
-import { Feather } from '@expo/vector-icons';
 import { BRAND, MAP_STYLE, THEME } from '@/constants/Colors';
+import { Feather } from '@expo/vector-icons';
+import React, { useRef } from 'react';
+import { ActivityIndicator, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import MapView, { MapPressEvent, Marker } from 'react-native-maps';
 
 interface MapModalProps {
   visible: boolean;
