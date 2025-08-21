@@ -20,30 +20,37 @@ import {
   useColorScheme,
 } from 'react-native';
 
+import { useAuth } from '@/services/AuthContext';
+import { addPontoRecolha } from '@/services/FirestoreService';
+import { GeoPoint } from 'firebase/firestore';
+
+import { CLOUDINARY_UPLOAD_PRESET, uploadToCloudinary } from '@/services/uploadCloudinary';
+
 type NewPoint = {
-  name: string;
-  description: string;
-  address: string;
-  residues: string[];
+  nome: string;
+  descricao: string;
+  endereco: string;
+  residuos: string[];
   lat?: number;
   lng?: number;
-  photoUri?: string | null;
+  photoUri?: string | null; // URI local antes do upload
 };
 
 const ALL_RESIDUES = Object.keys(RESIDUE_COLORS);
 
 export default function CriarEcoponto() {
   const router = useRouter();
+  const { user } = useAuth();
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const T = THEME[scheme];
   const TEXT_ON_INPUT = THEME.light.text;
   const PLACEHOLDER_ON_INPUT = THEME.light.textMuted;
 
   const [form, setForm] = useState<NewPoint>({
-    name: '',
-    description: '',
-    address: '',
-    residues: [],
+    nome: '',
+    descricao: '',
+    endereco: '',
+    residuos: [],
     lat: undefined,
     lng: undefined,
     photoUri: undefined,
@@ -54,7 +61,7 @@ export default function CriarEcoponto() {
   const [residueModalOpen, setResidueModalOpen] = useState(false);
   const [tempResidues, setTempResidues] = useState<string[]>([]);
   const openResidueModal = () => {
-    setTempResidues(form.residues);
+    setTempResidues(form.residuos);
     setResidueModalOpen(true);
   };
   const toggleResidueTemp = (key: string) => {
@@ -63,7 +70,7 @@ export default function CriarEcoponto() {
     );
   };
   const applyResidues = () => {
-    setForm((f) => ({ ...f, residues: tempResidues }));
+    setForm((f) => ({ ...f, residuos: tempResidues }));
     setResidueModalOpen(false);
   };
 
@@ -79,8 +86,9 @@ export default function CriarEcoponto() {
 
   const validate = () => {
     const errs: string[] = [];
-    if (!form.name.trim()) errs.push('• Nome do ponto');
-    if (form.residues.length === 0) errs.push('• Pelo menos um tipo de resíduo');
+    if (!user?.uid) errs.push('• Sessão não iniciada');
+    if (!form.nome.trim()) errs.push('• Nome do ponto');
+    if (form.residuos.length === 0) errs.push('• Pelo menos um tipo de resíduo');
     if (form.lat == null || form.lng == null) errs.push('• Localização no mapa');
     return errs;
   };
@@ -93,10 +101,48 @@ export default function CriarEcoponto() {
     }
     try {
       setSaving(true);
-      // TODO: integra com a tua API/estado
-      await new Promise((r) => setTimeout(r, 700));
-      Alert.alert('Sucesso', 'Ponto criado com sucesso!', [{ text: 'OK', onPress: () => router.back() }]);
-    } catch {
+
+      // 1) Upload da foto (se existir)
+      let fotoUrl: string | null = null;
+      if (form.photoUri) {
+        try {
+          const res = await uploadToCloudinary(form.photoUri, {
+            folder: `ecocollab/pontos/${user!.uid}`,
+            uploadPreset: CLOUDINARY_UPLOAD_PRESET,
+            publicId: `ponto_${Date.now()}`,
+            tags: ['pontoRecolha', user!.uid],
+            context: { uploadedBy: user!.uid },
+            contentType: 'image/jpeg',
+          });
+          fotoUrl = res?.secure_url ?? null;
+        } catch (e) {
+          console.warn('Falha no upload Cloudinary', e);
+          // Não bloqueia a criação do ponto se falhar o upload
+        }
+      }
+
+      // 2) Montar payload com a tua nova estrutura (PT)
+      const payload = {
+        nome: form.nome.trim(),
+        descricao: form.descricao.trim() || undefined,
+        endereco: form.endereco.trim() || undefined,
+        residuos: form.residuos,
+        localizacao: new GeoPoint(form.lat!, form.lng!),
+        fotoUrl: fotoUrl,
+        criadoPor: user!.uid,
+        criadoPorDisplay: user?.displayName ?? null,
+        status: 'pendente' as const,
+        // dataCriacao e dataAtualizacao são adicionados em FirestoreService via serverTimestamp()
+      };
+
+      // 3) Criar no Firestore
+      await addPontoRecolha(payload);
+
+      Alert.alert('Sucesso', 'Ponto criado com sucesso!', [
+        { text: 'OK', onPress: () => router.back() },
+      ]);
+    } catch (e) {
+      console.error(e);
       Alert.alert('Erro', 'Não foi possível criar o ponto.');
     } finally {
       setSaving(false);
@@ -111,7 +157,7 @@ export default function CriarEcoponto() {
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={28} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Detalhes do Ecoponto</Text>
+        <Text style={styles.headerTitle}>Criar Ponto de Recolha</Text>
         <View style={{ width: 28 }} />
       </View>
       <KeyboardAvoidingView
@@ -119,7 +165,7 @@ export default function CriarEcoponto() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20, paddingTop: 30 }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: 30 }}>
           {/* Foto */}
           <View style={styles.photoRow}>
             <Image
@@ -152,8 +198,8 @@ export default function CriarEcoponto() {
           {/* Campos */}
           <Field
             label="Nome do ponto"
-            value={form.name}
-            onChangeText={(t) => onChange('name', t)}
+            value={form.nome}
+            onChangeText={(t) => onChange('nome', t)}
             placeholder="Ex: Ecoponto Central"
             theme={T}
             textOnInput={TEXT_ON_INPUT}
@@ -161,8 +207,8 @@ export default function CriarEcoponto() {
           />
           <Field
             label="Descrição"
-            value={form.description}
-            onChangeText={(t) => onChange('description', t)}
+            value={form.descricao}
+            onChangeText={(t) => onChange('descricao', t)}
             placeholder="Notas úteis (horário, acessos, etc.)"
             theme={T}
             textOnInput={TEXT_ON_INPUT}
@@ -172,8 +218,8 @@ export default function CriarEcoponto() {
           />
           <Field
             label="Morada"
-            value={form.address}
-            onChangeText={(t) => onChange('address', t)}
+            value={form.endereco}
+            onChangeText={(t) => onChange('endereco', t)}
             placeholder="Rua, nº, código-postal, localidade"
             theme={T}
             textOnInput={TEXT_ON_INPUT}
@@ -189,8 +235,8 @@ export default function CriarEcoponto() {
               style={[styles.input, { backgroundColor: T.input, borderColor: T.inputBorder }]}
             >
               <Text style={{ color: TEXT_ON_INPUT, fontSize: 16 }}>
-                {form.residues.length > 0
-                  ? form.residues.map((r) => capitalize(r)).join(', ')
+                {form.residuos.length > 0
+                  ? form.residuos.map((r) => capitalize(r)).join(', ')
                   : 'Selecionar…'}
               </Text>
             </TouchableOpacity>
@@ -267,12 +313,12 @@ export default function CriarEcoponto() {
         </View>
       </Modal>
 
-      {/* Modal de mapa (componente) */}
+      {/* Modal de mapa */}
       <MapModal
         visible={mapOpen}
         onClose={() => setMapOpen(false)}
         onConfirm={(coords, address) => {
-          setForm((f) => ({ ...f, lat: coords.lat, lng: coords.lng, address: address || f.address }));
+          setForm((f) => ({ ...f, lat: coords.lat, lng: coords.lng, endereco: address || f.endereco }));
           setMapOpen(false);
         }}
         initialCoord={form.lat != null && form.lng != null ? { lat: form.lat, lng: form.lng } : null}

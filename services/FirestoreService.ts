@@ -1,11 +1,13 @@
 import { User } from 'firebase/auth';
 import {
+  addDoc,
   collection,
   doc,
+  GeoPoint,
   getDoc,
   serverTimestamp,
   setDoc,
-  updateDoc,
+  updateDoc
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -92,4 +94,30 @@ export function subscribeUserDoc(
   return onSnapshot(userRef(uid), (snap) => {
     callback(snap.exists() ? (snap.data() as UserMinimalDoc & UserExtras) : null);
   });
+}
+
+
+export type PontoRecolhaStatus = 'pendente' | 'aprovado' | 'reprovado';
+
+export type PontoRecolhaCreate = {
+  nome: string;
+  descricao?: string;
+  endereco?: string;
+  residuos: string[];
+  localizacao: GeoPoint;
+  fotoUrl?: string | null;
+  criadoPor: string;
+  criadoPorDisplay?: string | null;
+  status: PontoRecolhaStatus; // "pendente" na criação
+};
+
+const pontoRecolhaCol = collection(db, 'pontoRecolha');
+
+export async function addPontoRecolha(data: PontoRecolhaCreate): Promise<string> {
+  const docRef = await addDoc(pontoRecolhaCol, {
+    ...data,
+    dataCriacao: serverTimestamp(),
+    dataAtualizacao: serverTimestamp(),
+  });
+  return docRef.id;
 }
