@@ -1,39 +1,32 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
   Dimensions,
   Image,
   Linking,
   Platform,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 
 import { SimpleSelect } from '@/components/SimpleSelect';
 import { THEME } from '@/constants/Colors';
 
-type Ecoponto = {
-  id: number;
-  nome: string;
-  morada: string;
-  tipos: string[];
-  classificacao: number;
-  latitude: number;
-  longitude: number;
-};
-
-// MOCK (substitui por fetch/estado global)
-const MOCK: Ecoponto[] = [
-  { id: 1, nome: 'Ecoponto Vidro Centro', morada: 'Centro, Bragança', tipos: ['vidro'], classificacao: 4, latitude: 41.805, longitude: -6.756 },
-  { id: 2, nome: 'Ecoponto Escola', morada: 'Junto à Escola X', tipos: ['papel','plastico','metal'], classificacao: 3, latitude: 41.808, longitude: -6.754 },
-];
+// 🔥 Firestore + Auth + Cloudinary
+import { useAuth } from '@/services/AuthContext';
+import {
+  addReporte,
+  subscribePontoRecolhaById,
+  type PontoMarker,
+} from '@/services/FirestoreService';
+import { CLOUDINARY_UPLOAD_PRESET, uploadToCloudinary } from '@/services/uploadCloudinary';
 
 const PROBLEMAS = [
   { value: 'cheio', label: 'Contentor cheio' },
@@ -46,27 +39,34 @@ const PROBLEMAS = [
 export default function Report() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
+  const pontoId = Array.isArray(id) ? id[0] : id;
 
-  // Tema escuro fixo
+  const { user } = useAuth();
+
+  // Tema escuro fixo (como tinhas)
   const colors = THEME.dark;
   const bg = colors.bg;
   const text = colors.text;
+  const textInput = colors.textInput;
   const muted = colors.textMuted;
   const card = colors.card;
   const border = colors.border;
 
-  const ecoponto = useMemo<Ecoponto>(() => {
-    const nId = Number(id);
-    return MOCK.find((e) => e.id === nId) ?? MOCK[0];
-  }, [id]);
+  const [eco, setEco] = useState<PontoMarker | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // buscar ecoponto ao Firestore (tempo-real)
+  useEffect(() => {
+    if (!pontoId) return;
+    const unsub = subscribePontoRecolhaById(pontoId, (p) => {
+      setEco(p);
+      setLoading(false);
+    });
+    return () => unsub();
+  }, [pontoId]);
 
   const width = Dimensions.get('window').width;
   const height = Math.round(width * 9 / 16);
-
-  const API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY as string | undefined;
-  const streetViewUrl = API_KEY
-    ? `https://maps.googleapis.com/maps/api/streetview?size=${Math.min(width, 1200)}x${Math.min(height, 800)}&location=${ecoponto.latitude},${ecoponto.longitude}&fov=80&pitch=0&key=${API_KEY}`
-    : null;
 
   // Form state
   const [tipoProblema, setTipoProblema] = useState('cheio');
@@ -90,7 +90,8 @@ export default function Report() {
   };
 
   const abrirNavegacao = () => {
-    const { latitude: lat, longitude: lng, nome } = ecoponto;
+    if (!eco) return;
+    const { latitude: lat, longitude: lng, nome } = eco;
     const label = encodeURIComponent(nome);
     if (Platform.OS === 'ios') {
       Linking.openURL(`http://maps.apple.com/?daddr=${lat},${lng}&q=${label}`);
@@ -100,23 +101,45 @@ export default function Report() {
   };
 
   const submeter = async () => {
+    if (!user?.uid) return Alert.alert('Sessão', 'Tens de iniciar sessão para enviar um reporte.');
+    if (!pontoId) return Alert.alert('Erro', 'ID do ponto em falta.');
     if (!tipoProblema) return Alert.alert('Validação', 'Escolhe um tipo de problema.');
     if (!descricao || descricao.trim().length < 5) {
       return Alert.alert('Validação', 'Escreve uma descrição mais detalhada (≥ 5 caracteres).');
     }
+
     try {
       setAEnviar(true);
-      const payload = {
-        ecopontoId: ecoponto.id,
+
+      // 1) upload opcional da imagem
+      let fotoUrl: string | null = null;
+      if (imagemUri) {
+        const res = await uploadToCloudinary(imagemUri, {
+          folder: `ecocollab/reportes/${user.uid}`,
+          uploadPreset: CLOUDINARY_UPLOAD_PRESET,
+          publicId: `reporte_${Date.now()}`,
+          tags: ['reporte', user.uid, String(pontoId)],
+          context: { pontoId: String(pontoId), user: user.uid },
+          contentType: 'image/jpeg',
+        });
+        fotoUrl = res?.secure_url ?? null;
+      }
+
+      // 2) gravar reporte no Firestore
+      await addReporte({
+        pontoId: String(pontoId),
         tipo: tipoProblema,
         descricao: descricao.trim(),
-        imagemUri
-      };
-      // TODO: ligar à tua API (multipart/form-data se precisares da imagem)
-      console.log('REPORT_PAYLOAD', payload);
+        fotoUrl,
+        criadoPor: user.uid,
+        criadoPorDisplay: user.displayName ?? null,
+        status: 'aberto',
+      });
+
       Alert.alert('Obrigado!', 'O teu reporte foi enviado com sucesso.');
       router.back();
     } catch (e) {
+      console.error(e);
       Alert.alert('Erro', 'Não foi possível enviar o reporte. Tenta novamente.');
     } finally {
       setAEnviar(false);
@@ -124,9 +147,10 @@ export default function Report() {
   };
 
   return (
+    
     <View style={{ flex: 1, backgroundColor: bg }}>
       {/* Header dark */}
-      <View style={[styles.header, { backgroundColor: colors.bg, borderColor: colors.border }]}> 
+      <View style={[styles.header, { backgroundColor: colors.bg, borderColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={28} color={colors.text} />
         </TouchableOpacity>
@@ -134,23 +158,43 @@ export default function Report() {
         <View style={{ width: 28 }} />
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 28 }}>
-        {/* Street View */}
-        {streetViewUrl ? (
-          <Image source={{ uri: streetViewUrl }} style={{ width, height }} resizeMode="cover" />
+      <KeyboardAwareScrollView 
+        contentContainerStyle={{ paddingBottom: 28 }}
+        keyboardShouldPersistTaps="handled"
+        enableOnAndroid
+        extraScrollHeight={24}        // espaço extra entre input e teclado
+        extraHeight={24}              // ajuda em Android
+        enableAutomaticScroll
+      >
+        {/* Foto do ponto (se existir) ou placeholder */}
+        {eco?.fotoUrl ? (
+          <Image source={{ uri: eco.fotoUrl }} style={{ width, height }} resizeMode="cover" />
         ) : (
-          <View style={[styles.placeholder, { width, height, backgroundColor: card, borderColor: border }]}> 
+          <View style={[styles.placeholder, { width, height, backgroundColor: card, borderColor: border }]}>
             <Ionicons name="image" size={32} color={muted} />
-            <Text style={{ color: muted, marginTop: 6 }}>Street View não disponível</Text>
+            <Text style={{ color: muted, marginTop: 6 }}>Ponto de Recolha sem foto</Text>
           </View>
         )}
 
         {/* Conteúdo */}
         <View style={styles.content}>
           {/* Identificação */}
-          <Text style={[styles.nome, { color: text }]}>{ecoponto.nome}</Text>
-          <Text style={[styles.morada, { color: muted }]}>{ecoponto.morada}</Text>
-  
+          <Text style={[styles.nome, { color: textInput }]}>{eco?.nome ?? 'Ecoponto'}</Text>
+          {!!eco?.morada && <Text style={[styles.morada, { color: muted }]}>{eco.morada}</Text>}
+
+          {/* Ações rápidas */}
+          {eco?.latitude != null && eco?.longitude != null && (
+            <View style={styles.actionsRow}>
+              <TouchableOpacity
+                style={[styles.actionBtn, { backgroundColor: '#2E7D32' }]}
+                onPress={abrirNavegacao}
+              >
+                <Ionicons name="navigate" size={18} color="#fff" />
+                <Text style={styles.actionBtnText}>Ir para o local</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           {/* Formulário */}
           <Text style={[styles.subTitle, { color: text }]}>Tipo de problema</Text>
           <SimpleSelect value={tipoProblema} onChange={setTipoProblema} options={PROBLEMAS} />
@@ -159,9 +203,9 @@ export default function Report() {
           <TextInput
             style={[
               styles.inputDesc,
-              { backgroundColor: card, borderColor: border, color: text }
+              { backgroundColor: card, borderColor: border, color: textInput }
             ]}
-            placeholder="Explica o que está a acontecer..."
+            placeholder="Descreva detalhadamente o problema..."
             placeholderTextColor={muted}
             multiline
             value={descricao}
@@ -169,11 +213,13 @@ export default function Report() {
           />
 
           <TouchableOpacity
-            style={[styles.uploadBtn, { backgroundColor: colors.card }]}
+            style={[styles.uploadBtn, { backgroundColor: colors.bg }]}
             onPress={escolherImagem}
           >
             <Ionicons name="image" size={20} color={colors.text} />
-            <Text style={[styles.uploadBtnText, { color: colors.text }]}>{imagemUri ? 'Alterar imagem' : 'Anexar imagem'}</Text>
+            <Text style={[styles.uploadBtnText, { color: colors.text }]}>
+              {imagemUri ? 'Alterar imagem' : 'Anexar imagem'}
+            </Text>
           </TouchableOpacity>
 
           {imagemUri && (
@@ -189,7 +235,7 @@ export default function Report() {
             <Text style={[styles.submitBtnText, { color: colors.bg }]}>{aEnviar ? 'A enviar...' : 'Submeter'}</Text>
           </TouchableOpacity>
         </View>
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </View>
   );
 }
@@ -236,31 +282,6 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 8
   },
-  tiposWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 16
-  },
-  tipoChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 999,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    marginRight: 10,
-    marginBottom: 10,
-    borderWidth: 1
-  },
-  dot: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    marginRight: 8
-  },
-  tipoChipText: {
-    fontSize: 16,
-    fontWeight: '700'
-  },
   actionsRow: {
     flexDirection: 'row',
     gap: 12,
@@ -297,7 +318,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   uploadBtnText: {
-    // color definido inline pelo tema
     fontWeight: '800',
   },
   preview: {
@@ -315,7 +335,6 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   submitBtnText: {
-    // color definido inline pelo tema
     fontWeight: '900',
     fontSize: 16,
   },

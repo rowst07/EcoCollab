@@ -209,3 +209,33 @@ export function subscribePontoRecolhaById(
     cb(mapPontoToMarker(raw));
   });
 }
+
+export type ReporteStatus = 'aberto' | 'em_analise' | 'resolvido' | 'rejeitado';
+
+export type ReporteCreate = {
+  pontoId: string;                 // doc.id do pontoRecolha
+  tipo: string;                    // 'cheio' | 'partido' | ...
+  descricao: string;
+  fotoUrl?: string | null;
+  criadoPor: string;               // uid
+  criadoPorDisplay?: string | null;
+  status: ReporteStatus;           // 'aberto' na criação
+};
+
+export type ReporteDoc = ReporteCreate & {
+  id: string;
+  dataCriacao?: any;
+  dataAtualizacao?: any;
+};
+
+const reportesCol = collection(db, 'reportes');
+
+/** Cria um reporte */
+export async function addReporte(data: ReporteCreate): Promise<string> {
+  const ref = await addDoc(reportesCol, {
+    ...data,
+    dataCriacao: serverTimestamp(),
+    dataAtualizacao: serverTimestamp(),
+  });
+  return ref.id;
+}
