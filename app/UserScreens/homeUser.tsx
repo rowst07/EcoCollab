@@ -34,8 +34,7 @@ export default function HomeUser() {
     organico: true,
     classificacao: 'todos'
   });
-
-  // 📡 Subscrição Firestore (tempo-real)
+  
   useEffect(() => {
     // Por omissão: só "aprovado". Para incluir "pendente", troca para { statusIn: ['aprovado','pendente'] }
     const unsub = subscribePontosRecolha({

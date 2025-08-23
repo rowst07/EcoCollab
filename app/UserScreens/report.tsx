@@ -1,3 +1,4 @@
+// app/UserScreens/report.tsx
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -8,13 +9,13 @@ import {
   Image,
   Linking,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View
 } from 'react-native';
-import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 
 import { SimpleSelect } from '@/components/SimpleSelect';
 import { THEME } from '@/constants/Colors';
@@ -47,7 +48,6 @@ export default function Report() {
   const colors = THEME.dark;
   const bg = colors.bg;
   const text = colors.text;
-  const textInput = colors.textInput;
   const muted = colors.textMuted;
   const card = colors.card;
   const border = colors.border;
@@ -71,7 +71,7 @@ export default function Report() {
   // Form state
   const [tipoProblema, setTipoProblema] = useState('cheio');
   const [descricao, setDescricao] = useState('');
-  const [imagemUri, setImagemUri] = useState<string | null>(null);
+  const [imagens, setImagens] = useState<string[]>([]); // <— várias imagens
   const [aEnviar, setAEnviar] = useState(false);
 
   const escolherImagem = async () => {
@@ -82,11 +82,16 @@ export default function Report() {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.7
+      quality: 0.8
     });
     if (!result.canceled && result.assets.length > 0) {
-      setImagemUri(result.assets[0].uri);
+      const uri = result.assets[0].uri;
+      setImagens((prev) => [...prev, uri]);
     }
+  };
+
+  const removerImagem = (idx: number) => {
+    setImagens((prev) => prev.filter((_, i) => i !== idx));
   };
 
   const abrirNavegacao = () => {
@@ -111,18 +116,23 @@ export default function Report() {
     try {
       setAEnviar(true);
 
-      // 1) upload opcional da imagem
-      let fotoUrl: string | null = null;
-      if (imagemUri) {
-        const res = await uploadToCloudinary(imagemUri, {
-          folder: `ecocollab/reportes/${user.uid}`,
-          uploadPreset: CLOUDINARY_UPLOAD_PRESET,
-          publicId: `reporte_${Date.now()}`,
-          tags: ['reporte', user.uid, String(pontoId)],
-          context: { pontoId: String(pontoId), user: user.uid },
-          contentType: 'image/jpeg',
-        });
-        fotoUrl = res?.secure_url ?? null;
+      // 1) upload de TODAS as imagens (se existirem)
+      let fotosUrl: string[] = [];
+      if (imagens.length > 0) {
+        const uploads = imagens.map((uri, i) =>
+          uploadToCloudinary(uri, {
+            folder: `ecocollab/reportes/${user.uid}`,
+            uploadPreset: CLOUDINARY_UPLOAD_PRESET,
+            publicId: `reporte_${Date.now()}_${i}`,
+            tags: ['reporte', user.uid, String(pontoId)],
+            context: { pontoId: String(pontoId), user: user.uid },
+            contentType: 'image/jpeg',
+          })
+        );
+        const resps = await Promise.all(uploads);
+        fotosUrl = resps
+          .map((r) => r?.secure_url)
+          .filter((u): u is string => !!u);
       }
 
       // 2) gravar reporte no Firestore
@@ -130,7 +140,8 @@ export default function Report() {
         pontoId: String(pontoId),
         tipo: tipoProblema,
         descricao: descricao.trim(),
-        fotoUrl,
+        fotoUrl: fotosUrl[0] ?? null,  // retrocompat (primeira)
+        fotosUrl: fotosUrl,            // array completo
         criadoPor: user.uid,
         criadoPorDisplay: user.displayName ?? null,
         status: 'aberto',
@@ -147,7 +158,6 @@ export default function Report() {
   };
 
   return (
-    
     <View style={{ flex: 1, backgroundColor: bg }}>
       {/* Header dark */}
       <View style={[styles.header, { backgroundColor: colors.bg, borderColor: colors.border }]}>
@@ -158,14 +168,7 @@ export default function Report() {
         <View style={{ width: 28 }} />
       </View>
 
-      <KeyboardAwareScrollView 
-        contentContainerStyle={{ paddingBottom: 28 }}
-        keyboardShouldPersistTaps="handled"
-        enableOnAndroid
-        extraScrollHeight={24}        // espaço extra entre input e teclado
-        extraHeight={24}              // ajuda em Android
-        enableAutomaticScroll
-      >
+      <ScrollView contentContainerStyle={{ paddingBottom: 28 }}>
         {/* Foto do ponto (se existir) ou placeholder */}
         {eco?.fotoUrl ? (
           <Image source={{ uri: eco.fotoUrl }} style={{ width, height }} resizeMode="cover" />
@@ -179,7 +182,7 @@ export default function Report() {
         {/* Conteúdo */}
         <View style={styles.content}>
           {/* Identificação */}
-          <Text style={[styles.nome, { color: textInput }]}>{eco?.nome ?? 'Ecoponto'}</Text>
+          <Text style={[styles.nome, { color: text }]}>{eco?.nome ?? 'Ecoponto'}</Text>
           {!!eco?.morada && <Text style={[styles.morada, { color: muted }]}>{eco.morada}</Text>}
 
           {/* Ações rápidas */}
@@ -203,27 +206,52 @@ export default function Report() {
           <TextInput
             style={[
               styles.inputDesc,
-              { backgroundColor: card, borderColor: border, color: textInput }
+              { backgroundColor: card, borderColor: border, color: text }
             ]}
-            placeholder="Descreva detalhadamente o problema..."
+            placeholder="Explica o que está a acontecer..."
             placeholderTextColor={muted}
             multiline
             value={descricao}
             onChangeText={setDescricao}
           />
 
-          <TouchableOpacity
-            style={[styles.uploadBtn, { backgroundColor: colors.bg }]}
-            onPress={escolherImagem}
-          >
-            <Ionicons name="image" size={20} color={colors.text} />
-            <Text style={[styles.uploadBtnText, { color: colors.text }]}>
-              {imagemUri ? 'Alterar imagem' : 'Anexar imagem'}
-            </Text>
-          </TouchableOpacity>
+          {/* Botões de imagens */}
+          <View style={{ flexDirection: 'row', gap: 10, marginBottom: 10 }}>
+            <TouchableOpacity
+              style={[styles.uploadBtn, { backgroundColor: colors.bg, flex: 1 }]}
+              onPress={escolherImagem}
+            >
+              <Ionicons name="image" size={20} color={colors.text} />
+              <Text style={[styles.uploadBtnText, { color: colors.text }]}>Adicionar imagem</Text>
+            </TouchableOpacity>
 
-          {imagemUri && (
-            <Image source={{ uri: imagemUri }} style={styles.preview} />
+            {imagens.length > 0 && (
+              <TouchableOpacity
+                style={[styles.removeBtn, { backgroundColor: '#b00020' }]}
+                onPress={() => setImagens([])}
+              >
+                <Ionicons name="trash" size={18} color="#fff" />
+                <Text style={styles.removeBtnText}>Remover todas</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Pré‑visualização (com remover por item) */}
+          {imagens.length > 0 && (
+            <View style={styles.previewWrap}>
+              {imagens.map((uri, idx) => (
+                <View key={idx} style={styles.previewItem}>
+                  <Image source={{ uri }} style={styles.previewImg} />
+                  <TouchableOpacity
+                    style={styles.removeThumbBtn}
+                    onPress={() => removerImagem(idx)}
+                    accessibilityLabel="Remover esta imagem"
+                  >
+                    <Ionicons name="close" size={16} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
           )}
 
           <TouchableOpacity
@@ -235,14 +263,15 @@ export default function Report() {
             <Text style={[styles.submitBtnText, { color: colors.bg }]}>{aEnviar ? 'A enviar...' : 'Submeter'}</Text>
           </TouchableOpacity>
         </View>
-      </KeyboardAwareScrollView>
+      </ScrollView>
     </View>
   );
 }
 
+const THUMB = 86;
+
 const styles = StyleSheet.create({
   header: {
-    // backgroundColor e borderColor definidos inline pelo tema
     flexDirection: 'row',
     alignItems: 'center',
     paddingTop: 52,
@@ -252,7 +281,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   headerTitle: {
-    // color definido inline pelo tema
     fontSize: 20,
     fontWeight: '700',
   },
@@ -315,16 +343,49 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexDirection: 'row',
     gap: 8,
-    marginBottom: 12,
   },
   uploadBtnText: {
     fontWeight: '800',
   },
-  preview: {
-    width: '100%',
-    height: 180,
+  removeBtn: {
     borderRadius: 12,
-    marginBottom: 16
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  removeBtnText: {
+    color: '#fff',
+    fontWeight: '800',
+  },
+  previewWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 16,
+  },
+  previewItem: {
+    width: THUMB,
+    height: THUMB,
+    borderRadius: 10,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  previewImg: {
+    width: '100%',
+    height: '100%',
+  },
+  removeThumbBtn: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    backgroundColor: '#00000088',
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   submitBtn: {
     borderRadius: 14,
