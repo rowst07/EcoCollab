@@ -72,7 +72,7 @@ export default function PesquisaModal({
   return (
     <Modal visible={visible} animationType="slide">
       <View style={styles.modalContainer}>
-        <Text style={styles.modalTitle}>Pesquisar Ecoponto</Text>
+        <Text style={styles.modalTitle}>Pesquisar um Ponto</Text>
 
         {/* SCROLL GERAL DO MODAL */}
         <ScrollView
@@ -83,7 +83,7 @@ export default function PesquisaModal({
           {/* Pesquisa */}
           <TextInput
             style={styles.input}
-            placeholder="Digite um nome, morada ou termo…"
+            placeholder="Digite um nome..."
             placeholderTextColor={colors.textMuted}
             value={pesquisa}
             onChangeText={setPesquisa}
@@ -116,7 +116,7 @@ export default function PesquisaModal({
           {mostrarFiltros && (
             <>
               {/* Tipos de resíduo */}
-              <Text style={[styles.subTitle, { marginTop: 16 }]}>Tipos de resíduo</Text>
+              <Text style={[styles.subTitle, { marginTop: 16 }]}>Tipos de Resíduos</Text>
               <View style={styles.grid}>
                 {Object.keys(filtros)
                   .filter((k) => !['classificacao', 'status', 'comFoto', 'ordenar', 'tiposExcluidos'].includes(k))
@@ -291,7 +291,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: colors.card, // restaurado
+    backgroundColor: colors.bg, // restaurado
   },
   btnLimparText: {
     color: colors.text, // restaurado
@@ -362,11 +362,11 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
   },
   chipText: {
-    color: colors.text,
+    color: colors.textInput,
     fontWeight: '600',
   },
   chipTextAtivo: {
-    color: THEME.dark.bg,
+    color: THEME.dark.input,
   },
   rowWrap: {
     flexDirection: 'row',

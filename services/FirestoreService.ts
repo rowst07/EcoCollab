@@ -6,7 +6,7 @@ import {
   doc,
   GeoPoint,
   getDoc,
-  // 🔽 novos imports para queries/listeners
+  getDocs,
   onSnapshot,
   orderBy,
   query,
@@ -14,7 +14,7 @@ import {
   setDoc,
   updateDoc,
   where,
-  type Unsubscribe
+  type Unsubscribe,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -139,7 +139,7 @@ export type PontoMarker = {
   tipos: string[];         // mapeado de 'residuos'
   latitude: number;
   longitude: number;
-  classificacao?: number;  // opcional (se vieres a ter ratings)
+  classificacao?: number;  // opcional
   morada?: string;         // mapeado de 'endereco'
   descricao?: string;
   fotoUrl?: string | null;
@@ -155,7 +155,7 @@ export function mapPontoToMarker(d: PontoRecolhaDoc): PontoMarker | null {
     tipos: Array.isArray(d.residuos) ? d.residuos : [],
     latitude: d.localizacao.latitude,
     longitude: d.localizacao.longitude,
-    classificacao: undefined, // se adicionares avaliação, preenche aqui
+    classificacao: undefined,
     morada: d.endereco,
     descricao: d.descricao,
     fotoUrl: d.fotoUrl ?? null,
@@ -171,13 +171,12 @@ export function subscribePontosRecolha(args: {
 }): Unsubscribe {
   const { statusEq, statusIn, onData } = args;
 
-  let q = query(pontoRecolhaCol);
-  if (statusEq) q = query(q, where('status', '==', statusEq));
-  if (statusIn && statusIn.length > 0) q = query(q, where('status', 'in', statusIn));
-  // opcional: ordenação por data
-  q = query(q, orderBy('dataCriacao', 'desc'));
+  let qy = query(pontoRecolhaCol);
+  if (statusEq) qy = query(qy, where('status', '==', statusEq));
+  if (statusIn && statusIn.length > 0) qy = query(qy, where('status', 'in', statusIn));
+  qy = query(qy, orderBy('dataCriacao', 'desc'));
 
-  return onSnapshot(q, (snap) => {
+  return onSnapshot(qy, (snap) => {
     const list: PontoMarker[] = [];
     snap.forEach((docSnap) => {
       const raw = { id: docSnap.id, ...(docSnap.data() as any) } as PontoRecolhaDoc;
@@ -210,6 +209,8 @@ export function subscribePontoRecolhaById(
   });
 }
 
+// ===================== REPORTES =====================
+
 export type ReporteStatus = 'aberto' | 'em_analise' | 'resolvido' | 'rejeitado';
 
 export type ReporteCreate = {
@@ -238,4 +239,46 @@ export async function addReporte(data: ReporteCreate): Promise<string> {
     dataAtualizacao: serverTimestamp(),
   });
   return ref.id;
+}
+
+// ===================== STATS POR UTILIZADOR =====================
+
+export type UserStats = {
+  pontosCriados: number; // nº de documentos em /pontoRecolha com criadoPor == uid
+  reportes: number;      // nº de documentos em /reportes com criadoPor == uid
+};
+
+/** Leitura única das contagens */
+export async function getUserStats(uid: string): Promise<UserStats> {
+  const pSnap = await getDocs(query(pontoRecolhaCol, where('criadoPor', '==', uid)));
+  const rSnap = await getDocs(query(reportesCol, where('criadoPor', '==', uid)));
+  return { pontosCriados: pSnap.size, reportes: rSnap.size };
+}
+
+/** Subscrição em tempo-real às contagens de pontos + reportes (callback recebe a combinação) */
+export function subscribeUserStats(uid: string, cb: (stats: UserStats) => void): Unsubscribe {
+  let current: UserStats = { pontosCriados: 0, reportes: 0 };
+
+  const emit = () => cb({ ...current });
+
+  const unsubPontos = onSnapshot(
+    query(pontoRecolhaCol, where('criadoPor', '==', uid)),
+    (snap) => {
+      current.pontosCriados = snap.size;
+      emit();
+    }
+  );
+
+  const unsubReportes = onSnapshot(
+    query(reportesCol, where('criadoPor', '==', uid)),
+    (snap) => {
+      current.reportes = snap.size;
+      emit();
+    }
+  );
+
+  return () => {
+    unsubPontos();
+    unsubReportes();
+  };
 }

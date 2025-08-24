@@ -87,7 +87,7 @@ export default function Retomas() {
               <Text style={[styles.itemType, { color: colors.textOnCard }]}>{`Tipo: ${item.tipo}`}</Text>
               <Text style={styles.itemPoints}>+{item.pontos} pontos</Text>
               <TouchableOpacity style={styles.btn}>
-                <Text style={[styles.btnText, { color: colors.textOnCard }]}>Ver detalhes</Text>
+                <Text style={[styles.btnText, { color: colors.text }]}>Ver detalhes</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -97,7 +97,7 @@ export default function Retomas() {
       {/* Botão de publicar retoma */}
       {abaAtiva === 'minhas' && (
         <TouchableOpacity style={styles.floatingBtn} onPress={() => setModalVisible(true)}>
-          <MaterialCommunityIcons name="plus" size={24} color={colors.textInput} />
+          <MaterialCommunityIcons name="plus" size={24} color={colors.text} />
           <Text style={styles.floatingBtnText}>Publicar retoma</Text>
         </TouchableOpacity>
       )}
@@ -140,13 +140,13 @@ const styles = StyleSheet.create({
   },
   tabText: {
     fontSize: 16,
-    color: colors.text,
+    color: colors.textInput,
   },
   activeTab: {
     backgroundColor: colors.primary,
   },
   activeTabText: {
-    color: colors.textInput,
+    color: colors.text,
     fontWeight: 'bold',
   },
   card: {
@@ -202,7 +202,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   floatingBtnText: {
-    color: colors.textInput,
+    color: colors.text,
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,

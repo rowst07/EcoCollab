@@ -1,8 +1,10 @@
 // app/SharedScreens/Perfil.tsx
 import { useUserDoc } from '@/hooks/useUserDoc';
+import { useAuth } from '@/services/AuthContext';
+import { subscribeUserStats, type UserStats } from '@/services/FirestoreService';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Image,
   StyleSheet,
@@ -19,12 +21,25 @@ export default function Perfil() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const T = THEME[scheme];
   const { userDoc, loading } = useUserDoc();
+  const { user } = useAuth();
 
+  // Labels de role (corrigido: 'moderator' em vez de 'mod')
   const ROLE_LABELS: Record<string, string> = {
-  user: 'Utilizador',
-  mod: 'Moderador',
-  admin: 'Administrador',
-};
+    user: 'Utilizador',
+    moderator: 'Moderador',
+    admin: 'Administrador',
+  };
+
+  // stats em tempo-real: pontos criados + reportes submetidos
+  const [stats, setStats] = useState<UserStats>({ pontosCriados: 0, reportes: 0 });
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    const unsub = subscribeUserStats(user.uid, setStats);
+    return () => unsub();
+  }, [user?.uid]);
+
+  const totalRetomas = stats.pontosCriados + stats.reportes;
 
   return (
     <View style={[styles.wrapper, { backgroundColor: T.bg }]}>
@@ -55,25 +70,32 @@ export default function Perfil() {
             style={[styles.avatar, { backgroundColor: T.card }]}
           />
         ) : (
-          <View style={[styles.avatar, { backgroundColor: T.card, alignItems: 'center', justifyContent: 'center' }]}> 
+          <View style={[styles.avatar, { backgroundColor: T.card, alignItems: 'center', justifyContent: 'center' }]}>
             <Feather name="user" size={48} color={T.textMuted} />
           </View>
         )}
         <View style={styles.userInfo}>
-          <Text style={[styles.name, { color: T.text }]}>{userDoc?.nome}</Text>
-          <Text style={[styles.role, { color: T.textMuted }]}>{userDoc?.role ? ROLE_LABELS[userDoc.role] || userDoc.role : ''}</Text>
+          <Text style={[styles.name, { color: T.text }]}>{userDoc?.nome || '—'}</Text>
+          <Text style={[styles.role, { color: T.textMuted }]}>
+            {userDoc?.role ? ROLE_LABELS[userDoc.role] || userDoc.role : ''}
+          </Text>
         </View>
       </View>
 
       {/* Estatísticas */}
       <View style={styles.statsSection}>
         <View style={[styles.statBox, { backgroundColor: T.card, borderColor: T.border }]}>
-          <Text style={[styles.statNumber, { color: BRAND.primary }]}>38</Text>
-          <Text style={[styles.statLabel, { color: T.textInput }]}>{'Retomas'}</Text>
+          <Text style={[styles.statNumber, { color: BRAND.primary }]}>
+            {loading ? '—' : totalRetomas}
+          </Text>
+          <Text style={[styles.statLabel, { color: T.textInput }]}>Retomas</Text>
+          <Text style={{ color: T.textMuted, marginTop: 4, fontSize: 12 }}>
+            {`${stats.pontosCriados} EcoPs + ${stats.reportes} Reportes`}
+          </Text>
         </View>
         <View style={[styles.statBox, { backgroundColor: T.card, borderColor: T.border }]}>
           <Text style={[styles.statNumber, { color: BRAND.primary }]}>1240</Text>
-          <Text style={[styles.statLabel, { color: T.textInput }]}>{'Pontos'}</Text>
+          <Text style={[styles.statLabel, { color: T.textInput }]}>Pontos</Text>
         </View>
       </View>
 

@@ -100,7 +100,7 @@ export default function HomeUser() {
         <TouchableOpacity style={styles.searchBar} onPress={() => setPesquisaModal(true)}>
           <Ionicons name="search" size={20} color="#888" />
           <Text style={styles.searchPlaceholder}>
-            {pesquisa ? pesquisa : 'Pesquisar ecoponto...'}
+            {pesquisa ? pesquisa : 'Pesquisar um ponto de recolha...'}
           </Text>
         </TouchableOpacity>
       </View>
