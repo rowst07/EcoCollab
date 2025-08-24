@@ -1,6 +1,7 @@
 import NovaRetomaModal from '@/components/modals/CriarRetomaModal';
 import { THEME } from '@/constants/Colors';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { useState } from 'react';
 import {
   FlatList,
@@ -86,9 +87,30 @@ export default function Retomas() {
               <Text style={[styles.itemTitle, { color: colors.textOnCard }]}>{item.nome}</Text>
               <Text style={[styles.itemType, { color: colors.textOnCard }]}>{`Tipo: ${item.tipo}`}</Text>
               <Text style={styles.itemPoints}>+{item.pontos} pontos</Text>
-              <TouchableOpacity style={styles.btn}>
-                <Text style={[styles.btnText, { color: colors.text }]}>Ver detalhes</Text>
-              </TouchableOpacity>
+              <TouchableOpacity
+  style={styles.btn}
+  onPress={() =>
+    router.push({
+      pathname: '/UserScreens/detalhesRetoma',
+      params: {
+        id: item.id,
+        nome: item.nome,
+        tipo: item.tipo,
+        pontos: item.pontos,
+        icon: item.icon,
+        // opcionais:
+        descricao: 'Exemplo de descrição da retoma.',
+        quantidade: '1 unidade',
+        local: 'Centro, Bragança',
+        estado: 'Ativa',
+        autor: 'João Monteiro',
+        eMinha: abaAtiva === 'minhas', // se vier da aba "Minhas Retomas"
+      },
+    })
+  }
+>
+  <Text style={[styles.btnText, { color: colors.text }]}>Ver detalhes</Text>
+</TouchableOpacity>
             </View>
           </View>
         )}
