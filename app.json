@@ -9,7 +9,10 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "config": {
+        "googleMapsApiKey": "AIzaSyD2DPKFX-oEM_kG_y5VhNjGxNLrd8TxEEA"
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -39,6 +42,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "55444c3f-3b35-43e8-a10c-21b2988824cb"
+      }
     }
   }
 }
