@@ -3,7 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import MapView, { Callout, Marker } from 'react-native-maps';
+import MapView, { Callout, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 
 // 🔥 serviço Firestore (novas funções abaixo)
 import { subscribePontosRecolha, type PontoMarker } from '@/services/FirestoreService';
@@ -34,9 +34,8 @@ export default function HomeUser() {
     organico: true,
     classificacao: 'todos'
   });
-  
+
   useEffect(() => {
-    // Por omissão: só "aprovado". Para incluir "pendente", troca para { statusIn: ['aprovado','pendente'] }
     const unsub = subscribePontosRecolha({
       statusEq: 'aprovado',
       onData: setEcopontos,
@@ -107,6 +106,7 @@ export default function HomeUser() {
 
       {/* Mapa */}
       <MapView
+        provider={PROVIDER_GOOGLE}
         style={{ flex: 1 }}
         initialRegion={{
           latitude: 41.805,
@@ -114,6 +114,9 @@ export default function HomeUser() {
           latitudeDelta: 0.02,
           longitudeDelta: 0.02
         }}
+        loadingEnabled
+        onMapReady={() => console.log('[Map] ready')}
+        onMapLoaded={() => console.log('[Map] loaded')}
       >
         {filtrados.map(e => (
           <Marker
@@ -143,13 +146,11 @@ export default function HomeUser() {
             </Callout>
           </Marker>
         ))}
-
       </MapView>
 
       {/* Botão flutuante para criar novo ponto */}
       <TouchableOpacity
         style={styles.fab}
-        // caminho do teu ecrã de criação: está em SharedScreens
         onPress={() => router.push('/UserScreens/criarEcoponto')}
       >
         <Ionicons name="add" size={28} color="#fff" />
@@ -296,7 +297,7 @@ const styles = StyleSheet.create({
   // Botão "Painel de Moderador"
   modBtn: {
     position: 'absolute',
-    bottom: 110, // acima da bottom bar
+    bottom: 110,
     left: 12,
     backgroundColor: '#2E7D32',
     paddingVertical: 10,
