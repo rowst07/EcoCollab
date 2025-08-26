@@ -502,3 +502,21 @@ export function subscribeRetomaById(
     cb(raw);
   });
 }
+
+// edita/atualiza apenas campos parciais permitidos pelas rules
+export async function updateRetomaPartial(id: string, data: Partial<RetomaDoc>) {
+  const dref = doc(retomasCol, id);
+  const patch = {
+    ...data,
+    dataAtualizacao: serverTimestamp(),
+  };
+  await updateDoc(dref, patch as any);
+}
+
+// utilitário simples para saber o role atual do utilizador
+export async function getUserRole(uid: string): Promise<Role> {
+  const snap = await getDoc(userRef(uid));
+  if (!snap.exists()) return 'user';
+  const data = snap.data() as any;
+  return (data.role ?? 'user') as Role;
+}

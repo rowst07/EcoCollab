@@ -1,4 +1,3 @@
-// app/UserScreens/detalhesRetoma.tsx
 import { THEME } from '@/constants/Colors';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -7,6 +6,8 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Modal,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -22,167 +23,86 @@ import {
   type RetomaDoc,
 } from '@/services/FirestoreService';
 
-type RetomaUI = {
-  id: string;
-  nome: string;
-  tipo: 'Troca' | 'Doação' | string;
-  pontos: number;
-  icon?: string;
-  descricao?: string;
-  fotoUrl?: string | null;  // <- da BD
-  fotoUri?: string | null;  // <- fallback vindo por params
-  quantidade?: string;
-  condicao?: string;
-  entrega?: string;
-  local?: string;
-  lat?: number | null;
-  lng?: number | null;
-  estado?: 'Ativa' | 'Reservada' | 'Concluída';
-  autor?: string;       // nome a mostrar (atual)
-  criadoPor?: string;   // uid
-  eMinha?: boolean;
-  preferencias?: string;
-  tags?: string[];
-  validade?: string | null;
-  createdAtLabel?: string;
-};
+/* util */
+function getIconForTipo(tipo?: string, fallbackIcon?: string) {
+  if (fallbackIcon) return fallbackIcon as any;
+  const t = (tipo || '').toLowerCase();
+  if (t === 'troca') return 'swap-horizontal' as any;
+  return 'gift-outline' as any;
+}
+type Estado = 'Ativa' | 'Reservada' | 'Concluída';
 
 export default function DetalhesRetoma() {
   const scheme = useColorScheme() === 'dark' ? 'dark' : 'light';
   const colors = THEME[scheme];
   const router = useRouter();
-  const params = useLocalSearchParams();
+
+  const { id: idParam } = useLocalSearchParams();
+  const id = typeof idParam === 'string' ? idParam : undefined;
 
   const [loading, setLoading] = useState(true);
-  const [retoma, setRetoma] = useState<RetomaUI | null>(null);
-  const [favorito, setFavorito] = useState(false);
+  const [retoma, setRetoma] = useState<RetomaDoc | null>(null);
+  const [autorNome, setAutorNome] = useState<string>('—');
+  const uid = auth.currentUser?.uid;
 
-  const idParam = params.id ? String(params.id) : undefined;
+  const isOwner = useMemo(
+    () => !!uid && !!retoma?.criadoPor && uid === retoma.criadoPor,
+    [uid, retoma?.criadoPor]
+  );
 
-  // Base inicial a partir dos params (se navegares com objeto)
-  const baseFromParams: RetomaUI | null = useMemo(() => {
-    if (!params || !idParam) return null;
-    return {
-      id: idParam,
-      nome: String(params.nome ?? 'Retoma'),
-      tipo: (params.tipo as string) ?? 'Troca',
-      pontos: Number(params.pontos ?? 0),
-      icon: (params.icon as string) ?? 'recycle',
-      descricao:
-        (params.descricao as string) ??
-        'Sem descrição. Adiciona uma descrição para facilitar a troca/doação.',
-      fotoUri: (params.fotoUri as string) ?? null,
-      quantidade: (params.quantidade as string) ?? '—',
-      condicao: (params.condicao as string) ?? 'Usado',
-      entrega: (params.entrega as string) ?? 'Levantamento',
-      local: (params.local as string) ?? '—',
-      estado: (params.estado as any) ?? 'Ativa',
-      autor: (params.autor as string) ?? 'Utilizador',
-      eMinha: String(params.eMinha ?? '') === 'true',
-      preferencias: (params.preferencias as string) ?? '—',
-      tags: typeof params.tags === 'string' ? (params.tags as string).split(',').map(s => s.trim()).filter(Boolean) : [],
-      validade: (params.validade as string) ?? null,
-      criadoPor: undefined,
-    };
-  }, [params, idParam]);
-
-  // Subscrição à retoma na BD + leitura do nome atual do anunciante (users/{uid})
   useEffect(() => {
-    if (!idParam) {
-      // nem sequer temos id — fica só com os params
-      setRetoma(baseFromParams);
+    if (!id) {
       setLoading(false);
       return;
     }
+    const unsub = subscribeRetomaById(id, async (doc) => {
+      setRetoma(doc);
+      setLoading(false);
 
-    const unsub = subscribeRetomaById(idParam, async (docData: RetomaDoc | null) => {
-      try {
-        if (!docData) {
-          setRetoma(baseFromParams); // fallback visual
-          setLoading(false);
-          return;
-        }
-
-        // Buscar o nome atual do anunciante
-        let autorNome = baseFromParams?.autor ?? 'Utilizador';
-        if (docData.criadoPor) {
-          const userDoc = await getUserMinimalDoc(docData.criadoPor);
-          if (userDoc?.nome) autorNome = userDoc.nome;
-        }
-
-        const createdAtLabel =
-          docData.dataCriacao?.toDate?.()
-            ? new Date(docData.dataCriacao.toDate()).toLocaleDateString('pt-PT')
-            : undefined;
-
-        const ui: RetomaUI = {
-          id: docData.id,
-          nome: docData.nome,
-          tipo: docData.tipo,
-          pontos: docData.pontos ?? 0,
-          icon: docData.icon ?? 'recycle',
-          descricao: docData.descricao ?? '',
-          fotoUrl: docData.fotoUrl ?? null,
-          fotoUri: baseFromParams?.fotoUri ?? null, // apenas fallback
-          quantidade: docData.quantidade ?? '—',
-          condicao: docData.condicao ?? 'Usado',
-          entrega: docData.entrega ?? 'Levantamento',
-          local: docData.local ?? '—',
-          lat: docData.lat ?? null,
-          lng: docData.lng ?? null,
-          estado: docData.estado ?? 'Ativa',
-          autor: autorNome,                  // <- nome ATUAL do anunciante
-          criadoPor: docData.criadoPor,
-          eMinha: auth.currentUser?.uid === docData.criadoPor,
-          preferencias: docData.preferencias ?? '—',
-          tags: docData.tags ?? [],
-          validade: docData.validade ?? null,
-          createdAtLabel,
-        };
-
-        setRetoma(ui);
-        setLoading(false);
-      } catch (e) {
-        console.warn('Falha ao carregar anunciante:', e);
-        setRetoma({
-          ...(baseFromParams ?? {
-            id: idParam,
-            nome: 'Retoma',
-            tipo: 'Troca',
-            pontos: 0,
-          }),
-          // Fallback com o que veio da BD mesmo que falhe users
-          fotoUrl: docData?.fotoUrl ?? null,
-          autor: baseFromParams?.autor ?? 'Utilizador',
-        } as RetomaUI);
-        setLoading(false);
+      if (doc?.criadoPor) {
+        const u = await getUserMinimalDoc(doc.criadoPor);
+        setAutorNome(u?.nome ?? doc.criadoPorDisplay ?? 'Utilizador');
+      } else {
+        setAutorNome(doc?.criadoPorDisplay ?? 'Utilizador');
       }
     });
-
     return () => unsub();
-  }, [idParam, baseFromParams]);
+  }, [id]);
 
-  const fotoParaMostrar = retoma?.fotoUrl || retoma?.fotoUri || null;
+  // Galeria completa
+  const gallery = useMemo(() => {
+    const arr = Array.isArray((retoma as any)?.fotos) ? ((retoma as any).fotos as string[]) : [];
+    if (arr.length > 0) return arr;
+    return retoma?.fotoUrl ? [retoma.fotoUrl] : [];
+  }, [retoma]);
+
+  const capa = gallery[0] ?? null;
+  const thumbs = gallery.slice(1);
+  const tipoIcon = getIconForTipo(retoma?.tipo, retoma?.icon);
+
+  // Fullscreen viewer
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerIndex, setViewerIndex] = useState(0);
+  const openViewerAt = (idx: number) => { setViewerIndex(idx); setViewerOpen(true); };
+  const closeViewer = () => setViewerOpen(false);
+  const prevImg = () => setViewerIndex((i) => Math.max(0, i - 1));
+  const nextImg = () => setViewerIndex((i) => Math.min(gallery.length - 1, i + 1));
 
   const handlePrimaria = () => {
-    if (!retoma) return;
-    if (retoma.tipo?.toLowerCase() === 'troca') {
-      Alert.alert('Propor troca', 'Funcionalidade por ligar à conversa / proposta.');
+    if (retoma?.tipo?.toLowerCase() === 'troca') {
+      Alert.alert('Propor troca', 'Funcionalidade por ligar à conversa/proposta.');
     } else {
-      Alert.alert('Quero doar', 'Funcionalidade por ligar à conversa / confirmação.');
+      Alert.alert('Quero doar', 'Funcionalidade por ligar à conversa/confirmação.');
     }
   };
 
   const handleContactar = () => {
-    Alert.alert('Contactar', 'Abrir chat interno ou partilhar contacto — por implementar.');
+    Alert.alert('Contactar', 'Abrir chat interno — por implementar.');
   };
 
-  const handleEditar = () => {
-    Alert.alert('Editar retoma', 'Navegar para editar (a ligar).');
-  };
-
-  const handleDesativar = () => {
-    Alert.alert('Desativar retoma', 'Marcar como concluída/reservada (a ligar à BD).');
+  const editar = () => {
+    if (!id) return;
+    router.push({ pathname: '/UserScreens/editarRetoma', params: { id } });
   };
 
   if (loading) {
@@ -195,8 +115,13 @@ export default function DetalhesRetoma() {
 
   if (!retoma) {
     return (
-      <View style={[styles.wrapper, { backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' }]}>
-        <Text style={{ color: colors.text }}>Não foi possível carregar a retoma.</Text>
+      <View style={[styles.wrapper, { backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', padding: 24 }]}>
+        <Text style={{ color: colors.text, textAlign: 'center', marginBottom: 12 }}>
+          Não foi possível carregar a retoma.
+        </Text>
+        <TouchableOpacity onPress={() => router.back()} style={{ paddingVertical: 10, paddingHorizontal: 16, borderRadius: 10, backgroundColor: colors.primary }}>
+          <Text style={{ color: colors.text, fontWeight: '700' }}>Voltar</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -208,33 +133,24 @@ export default function DetalhesRetoma() {
         <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={22} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
-          Detalhes
-        </Text>
-        <TouchableOpacity style={styles.iconBtn} onPress={() => setFavorito((f) => !f)}>
-          <Ionicons
-            name={favorito ? 'heart' : 'heart-outline'}
-            size={22}
-            color={favorito ? colors.danger : colors.text}
-          />
+        <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>Detalhes</Text>
+        <TouchableOpacity style={styles.iconBtn} onPress={editar}>
+          <Ionicons name="create-outline" size={20} color={colors.text} />
         </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        {/* Hero / Ícone + Título */}
+        {/* Hero card */}
         <View style={[styles.card, { backgroundColor: colors.card }]}>
           <View style={styles.row}>
             <View style={styles.iconCircle}>
-              <MaterialCommunityIcons
-                name={(retoma.icon as any) || 'recycle'}
-                size={34}
-                color={colors.primary}
-              />
+              <MaterialCommunityIcons name={tipoIcon} size={34} color={colors.primary} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[styles.title, { color: colors.textInput }]} numberOfLines={2}>
                 {retoma.nome}
               </Text>
+
               <View style={styles.badgesRow}>
                 <View style={[styles.chip, { backgroundColor: colors.primary }]}>
                   <Text style={[styles.chipText, { color: colors.text }]}>{retoma.tipo}</Text>
@@ -247,7 +163,9 @@ export default function DetalhesRetoma() {
                     color={colors.primary}
                     style={{ marginRight: 4 }}
                   />
-                  <Text style={[styles.chipText, { color: colors.textInput }]}>+{retoma.pontos} pts</Text>
+                  <Text style={[styles.chipText, { color: colors.textInput }]}>
+                    +{retoma.pontos ?? 0} pts
+                  </Text>
                 </View>
 
                 <View
@@ -263,13 +181,34 @@ export default function DetalhesRetoma() {
                     },
                   ]}
                 />
-                <Text style={[styles.statusText, { color: colors.textInput }]}>{retoma.estado}</Text>
+                <Text style={[styles.statusText, { color: colors.textInput }]}>
+                  {(retoma.estado as Estado) ?? 'Ativa'}
+                </Text>
               </View>
             </View>
           </View>
 
-          {/* Foto se existir (da BD primeiro; params como fallback) */}
-          {fotoParaMostrar ? <Image source={{ uri: fotoParaMostrar }} style={styles.photo} /> : null}
+          {/* Capa (tap -> fullscreen) */}
+          {capa ? (
+            <TouchableOpacity activeOpacity={0.9} onPress={() => openViewerAt(0)}>
+              <Image source={{ uri: capa }} style={styles.cover} />
+            </TouchableOpacity>
+          ) : null}
+
+          {/* Thumbs */}
+          {thumbs.length > 0 && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: 10, marginTop: 10 }}
+            >
+              {thumbs.map((url, idx) => (
+                <TouchableOpacity key={url} onPress={() => openViewerAt(idx + 1)} activeOpacity={0.85}>
+                  <Image source={{ uri: url }} style={styles.thumb} />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
 
           {/* Ações principais */}
           <View style={styles.actionsRow}>
@@ -298,7 +237,11 @@ export default function DetalhesRetoma() {
 
           <View style={styles.infoRow}>
             <Text style={[styles.infoLabel, { color: colors.textInput }]}>Quantidade</Text>
-            <Text style={[styles.infoValue, { color: colors.textInput }]}>{retoma.quantidade ?? '—'}</Text>
+            <Text style={[styles.infoValue, { color: colors.textInput }]}>
+              {typeof (retoma as any).quantidade === 'number'
+                ? (retoma as any).quantidade
+                : (retoma as any).quantidade ?? '—'}
+            </Text>
           </View>
 
           <View style={styles.infoRow}>
@@ -316,71 +259,69 @@ export default function DetalhesRetoma() {
             <Text style={[styles.infoValue, { color: colors.textInput }]}>{retoma.local ?? '—'}</Text>
           </View>
 
-          {!!retoma.createdAtLabel && (
-            <View style={styles.infoRow}>
-              <Text style={[styles.infoLabel, { color: colors.textInput }]}>Publicado</Text>
-              <Text style={[styles.infoValue, { color: colors.textInput }]}>{retoma.createdAtLabel}</Text>
-            </View>
-          )}
-
           <View style={styles.infoRow}>
             <Text style={[styles.infoLabel, { color: colors.textInput }]}>Anunciante</Text>
-            <Text style={[styles.infoValue, { color: colors.textInput }]}>{retoma.autor ?? '—'}</Text>
+            <Text style={[styles.infoValue, { color: colors.textInput }]}>{autorNome}</Text>
           </View>
 
-          {retoma.validade ? (
-            <View style={styles.infoRow}>
-              <Text style={[styles.infoLabel, { color: colors.textInput }]}>Validade</Text>
-              <Text style={[styles.infoValue, { color: colors.textInput }]}>{retoma.validade}</Text>
-            </View>
-          ) : null}
+          <View style={styles.infoRow}>
+            <Text style={[styles.infoLabel, { color: colors.textInput }]}>Validade</Text>
+            <Text style={[styles.infoValue, { color: colors.textInput }]}>
+              {retoma && (retoma as any).validade
+                ? ((): string => {
+                    const v = (retoma as any).validade as string;
+                    const d = new Date(v);
+                    if (!isNaN(d.getTime())) {
+                      const dd = String(d.getDate()).padStart(2, '0');
+                      const mm = String(d.getMonth() + 1).padStart(2, '0');
+                      const yy = d.getFullYear();
+                      return `${dd}/${mm}/${yy}`;
+                    }
+                    return v;
+                  })()
+                : '—'}
+            </Text>
+          </View>
         </View>
 
         {/* Descrição */}
         <View style={[styles.card, { backgroundColor: colors.card }]}>
           <Text style={[styles.sectionTitle, { color: colors.textInput }]}>Descrição</Text>
-          <Text style={[styles.description, { color: colors.textInput }]}>{retoma.descricao || '—'}</Text>
+          <Text style={[styles.description, { color: colors.textInput }]}>
+            {retoma.descricao ?? 'Sem descrição.'}
+          </Text>
         </View>
 
-        {/* Preferências / Tags */}
-        {(retoma.preferencias && retoma.preferencias !== '—') || (retoma.tags?.length ?? 0) > 0 ? (
+        {/* Preferências & tags */}
+        {(retoma.preferencias || (retoma.tags ?? []).length > 0) && (
           <View style={[styles.card, { backgroundColor: colors.card }]}>
             <Text style={[styles.sectionTitle, { color: colors.textInput }]}>Preferências & Tags</Text>
-            {retoma.preferencias && retoma.preferencias !== '—' ? (
+            {retoma.preferencias ? (
               <Text style={[styles.description, { color: colors.textInput }]}>{retoma.preferencias}</Text>
             ) : null}
-            {(retoma.tags?.length ?? 0) > 0 ? (
+            {(retoma.tags ?? []).length > 0 ? (
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-                {retoma.tags!.map((t, i) => (
-                  <View key={i} style={[styles.tagChip, { borderColor: colors.primary }]}>
-                    <Text style={{ color: colors.textInput, fontWeight: '700', fontSize: 12 }}>#{t}</Text>
+                {(retoma.tags ?? []).map((t) => (
+                  <View key={t} style={[styles.tag, { borderColor: colors.primary }]}>
+                    <Text style={{ color: colors.textInput, fontWeight: '600' }}>#{t}</Text>
                   </View>
                 ))}
               </View>
             ) : null}
           </View>
-        ) : null}
+        )}
 
         {/* Ações do proprietário */}
-        {retoma.eMinha && (
+        {isOwner && (
           <View style={[styles.card, { backgroundColor: colors.card }]}>
             <Text style={[styles.sectionTitle, { color: colors.textInput }]}>Gestão</Text>
-
-            <View style={styles.ownerActions}>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
               <TouchableOpacity
                 style={[styles.ownerBtn, { borderColor: colors.primary }]}
-                onPress={handleEditar}
+                onPress={editar}
               >
                 <Ionicons name="create-outline" size={16} color={colors.primary} />
                 <Text style={[styles.ownerBtnText, { color: colors.primary }]}>Editar</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.ownerBtn, { borderColor: '#FF3B30' }]}
-                onPress={handleDesativar}
-              >
-                <Ionicons name="close-circle-outline" size={16} color="#FF3B30" />
-                <Text style={[styles.ownerBtnText, { color: '#FF3B30' }]}>Desativar</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -388,9 +329,75 @@ export default function DetalhesRetoma() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* ------- FULLSCREEN IMAGE VIEWER ------- */}
+      <Modal
+        visible={viewerOpen}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={closeViewer}
+      >
+        <View style={styles.modalRoot}>
+          <View style={styles.modalBackdrop} />
+
+          {/* A imagem vem primeiro (fica por baixo dos botões) */}
+          <Image
+            source={{ uri: gallery[viewerIndex] }}
+            style={styles.viewerImage}
+            resizeMode="contain"
+          />
+
+          {/* Overlay com botões e zonas de navegação */}
+          <View style={styles.overlay} pointerEvents="box-none">
+            {/* fechar */}
+            <TouchableOpacity style={styles.viewerClose} onPress={closeViewer} hitSlop={12}>
+              <Ionicons name="close" size={28} color="#fff" />
+            </TouchableOpacity>
+
+            {/* zona esquerda/direita (tap) */}
+            {gallery.length > 1 && (
+              <>
+                <Pressable
+                  onPress={prevImg}
+                  style={[styles.navZone, styles.leftZone]}
+                  pointerEvents={viewerIndex === 0 ? 'none' : 'auto'}
+                >
+                  <Ionicons
+                    name="chevron-back"
+                    size={34}
+                    color={viewerIndex === 0 ? '#ffffff55' : '#fff'}
+                  />
+                </Pressable>
+
+                <Pressable
+                  onPress={nextImg}
+                  style={[styles.navZone, styles.rightZone]}
+                  pointerEvents={viewerIndex >= gallery.length - 1 ? 'none' : 'auto'}
+                >
+                  <Ionicons
+                    name="chevron-forward"
+                    size={34}
+                    color={viewerIndex >= gallery.length - 1 ? '#ffffff55' : '#fff'}
+                  />
+                </Pressable>
+              </>
+            )}
+
+            {/* indicador */}
+            <View style={styles.viewerIndicator}>
+              <Text style={{ color: '#fff', fontWeight: '700' }}>
+                {viewerIndex + 1} / {gallery.length}
+              </Text>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
+
+const THUMB = 92;
 
 const styles = StyleSheet.create({
   wrapper: { flex: 1 },
@@ -403,98 +410,78 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   iconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center',
   },
   headerTitle: { fontSize: 20, fontWeight: '700' },
   content: { padding: 16, paddingBottom: 120 },
+
   card: {
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 16,
-    elevation: 2,
+    borderRadius: 14, padding: 16, marginBottom: 16, elevation: 2,
   },
   row: { flexDirection: 'row', alignItems: 'center' },
   iconCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-    backgroundColor: '#EEEDD7',
+    width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center',
+    marginRight: 12, backgroundColor: '#EEEDD7',
   },
   title: { fontSize: 18, fontWeight: '700' },
   badgesRow: { flexDirection: 'row', alignItems: 'center', marginTop: 6, flexWrap: 'wrap' },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
-    marginRight: 8,
-  },
+  chip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16, marginRight: 8 },
   chipText: { fontSize: 12, fontWeight: '600' },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginLeft: 4,
-    marginRight: 6,
-  },
+  statusDot: { width: 8, height: 8, borderRadius: 4, marginLeft: 4, marginRight: 6 },
   statusText: { fontSize: 12, fontWeight: '600' },
-  photo: {
-    width: '100%',
-    height: 220,
-    borderRadius: 12,
-    marginTop: 12,
-  },
+
+  cover: { width: '100%', height: 220, borderRadius: 12, marginTop: 12 },
+  thumb: { width: THUMB, height: THUMB, borderRadius: 10 },
+
   actionsRow: { flexDirection: 'row', marginTop: 14, gap: 10 },
-  primaryBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
+  primaryBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: 'center' },
   primaryBtnText: { fontSize: 16, fontWeight: '700' },
   secondaryBtn: {
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    flexDirection: 'row',
-    gap: 6,
+    paddingVertical: 12, paddingHorizontal: 14, borderRadius: 10, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1.5, flexDirection: 'row', gap: 6,
   },
   secondaryBtnText: { fontSize: 14, fontWeight: '700' },
+
   sectionTitle: { fontSize: 16, fontWeight: '700', marginBottom: 10 },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-  },
+  infoRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8 },
   infoLabel: { fontSize: 14, opacity: 0.9 },
   infoValue: { fontSize: 14, fontWeight: '600' },
   description: { fontSize: 14, lineHeight: 20 },
-  ownerActions: { flexDirection: 'row', gap: 10 },
+  tag: { borderWidth: 1.5, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999 },
+
   ownerBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    borderWidth: 1.5,
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
+    flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1.5, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 14,
   },
   ownerBtnText: { fontSize: 14, fontWeight: '700' },
-  tagChip: {
-    borderWidth: 1.5,
-    borderRadius: 14,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
+
+  // Fullscreen viewer
+  modalRoot: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: '#000000E6' },
+
+  viewerImage: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%' },
+
+  overlay: { ...StyleSheet.absoluteFillObject },
+
+  viewerClose: { position: 'absolute', top: 46, right: 16, padding: 10 },
+
+  navZone: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: '35%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  leftZone: { left: 0 },
+  rightZone: { right: 0 },
+
+  viewerIndicator: {
+    position: 'absolute',
+    bottom: 30,
+    alignSelf: 'center',
+    backgroundColor: '#00000080',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
   },
 });

@@ -24,8 +24,16 @@ import {
 
 type Aba = 'disponiveis' | 'minhas';
 
+// helper: escolhe o ícone com base no tipo (respeita item.icon se existir)
+function getIconForTipo(tipo?: string, fallbackIcon?: string) {
+  if (fallbackIcon) return fallbackIcon as any;
+  const t = (tipo || '').toLowerCase();
+  if (t === 'troca') return 'handshake-outline' as any; // troca
+  return 'gift-outline' as any;                       // doação (ou default)
+}
+
 export default function Retomas() {
-  const scheme = useColorScheme() === 'dark' ? 'dark' : 'dark'; // força dark (ajusta se quiseres)
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'dark';
   const colors = THEME[scheme];
   const router = useRouter();
 
@@ -73,7 +81,6 @@ export default function Retomas() {
   const carregando = abaAtiva === 'disponiveis' ? loadingDisp : loadingMinhas;
 
   const onRefresh = () => {
-    // como estamos com onSnapshot, o "refresh" é só feedback visual
     setRefreshing(true);
     setTimeout(() => setRefreshing(false), 700);
   };
@@ -86,7 +93,7 @@ export default function Retomas() {
         nome: item.nome,
         tipo: item.tipo,
         pontos: item.pontos ?? 0,
-        icon: item.icon ?? 'recycle',
+        icon: item.icon ?? '', // enviado mas pode ser ignorado se vazio
         descricao: item.descricao ?? '',
         quantidade: item.quantidade ?? '—',
         local: item.local ?? '—',
@@ -98,52 +105,53 @@ export default function Retomas() {
         entrega: item.entrega ?? 'Levantamento',
         preferencias: item.preferencias ?? '—',
         tags: (item.tags ?? []).join(','),
-        createdAt: item.dataCriacao ? '' : '', // podes formatar quando leres diretamente do doc
+        createdAt: item.dataCriacao ? '' : '',
         validade: item.validade ?? undefined,
         eMinha: auth.currentUser?.uid === item.criadoPor,
+        fotoUri: item.fotoUrl ?? '', // fallback visual imediato
       },
     });
   };
 
-  const renderItem = ({ item }: { item: RetomaDoc }) => (
-    <View style={[styles.card, { backgroundColor: colors.card }]}>
-      <MaterialCommunityIcons
-        name={(item.icon as any) || 'recycle'}
-        size={32}
-        color={colors.primary}
-        style={styles.icon}
-      />
-      <View style={styles.cardContent}>
-        <Text style={[styles.itemTitle, { color: colors.textOnCard }]} numberOfLines={1}>
-          {item.nome}
-        </Text>
-        <Text style={[styles.itemType, { color: colors.textOnCard }]} numberOfLines={1}>
-          {`Tipo: ${item.tipo}`}
-        </Text>
-        <Text style={[styles.itemPoints, { color: colors.primary }]}>
-          +{item.pontos ?? 0} pontos
-        </Text>
+  const renderItem = ({ item }: { item: RetomaDoc }) => {
+    const iconName = getIconForTipo(item.tipo);
+    return (
+      <View style={[styles.card, { backgroundColor: colors.card }]}>
+        <MaterialCommunityIcons
+          name={iconName}
+          size={32}
+          color={colors.primary}
+          style={styles.icon}
+        />
+        <View style={styles.cardContent}>
+          <Text style={[styles.itemTitle, { color: colors.textOnCard }]} numberOfLines={1}>
+            {item.nome}
+          </Text>
+          <Text style={[styles.itemType, { color: colors.textOnCard }]} numberOfLines={1}>
+            {`Tipo: ${item.tipo}`}
+          </Text>
+          <Text style={[styles.itemPoints, { color: colors.primary }]}>
+            +{item.pontos ?? 0} pontos
+          </Text>
 
-        <TouchableOpacity style={[styles.btn, { backgroundColor: colors.primary }]} onPress={() => abrirDetalhes(item)}>
-          <Text style={[styles.btnText, { color: colors.text }]}>Ver detalhes</Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.btn, { backgroundColor: colors.primary }]}
+            onPress={() => abrirDetalhes(item)}
+          >
+            <Text style={[styles.btnText, { color: colors.text }]}>Ver detalhes</Text>
+          </TouchableOpacity>
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   const renderEmpty = () => {
     if (carregando) return null;
     return (
       <View style={styles.emptyWrap}>
         <Text style={[styles.emptyTitle, { color: colors.text }]}>
-          {abaAtiva === 'disponiveis' ? 'Sem retomas ativas' : 'Ainda não publicaste retomas'}
+          {abaAtiva === 'disponiveis' ? 'Sem retomas ativas' : 'Ainda não publicaste nenhuma retoma'}
         </Text>
-        {abaAtiva === 'minhas' && (
-          <TouchableOpacity style={[styles.floatingBtn, { position: 'relative', bottom: undefined }]} onPress={() => setModalVisible(true)}>
-            <MaterialCommunityIcons name="plus" size={24} color={colors.text} />
-            <Text style={styles.floatingBtnText}>Publicar retoma</Text>
-          </TouchableOpacity>
-        )}
       </View>
     );
   };
@@ -212,7 +220,7 @@ export default function Retomas() {
       <NovaRetomaModal
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
-        onPublicar={() => { /* não precisamos atualizar manualmente; onSnapshot trata disso */ }}
+        onPublicar={() => {}}
         currentUserName={auth.currentUser?.displayName ?? undefined}
       />
     </View>
@@ -220,84 +228,25 @@ export default function Retomas() {
 }
 
 const styles = StyleSheet.create({
-  wrapper: {
-    flex: 1,
-    paddingTop: 60,
-    paddingHorizontal: 20,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  tabs: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginBottom: 20,
-  },
-  tab: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 20,
-    marginHorizontal: 5,
-  },
-  tabText: {
-    fontSize: 16,
-  },
-  card: {
-    flexDirection: 'row',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 16,
-    alignItems: 'center',
-    elevation: 2,
-  },
-  icon: {
-    marginRight: 16,
-  },
-  cardContent: {
-    flex: 1,
-  },
-  itemTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  itemType: {
-    fontSize: 14,
-    marginBottom: 2,
-  },
-  itemPoints: {
-    fontSize: 14,
-    marginBottom: 8,
-  },
-  btn: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    alignSelf: 'flex-start',
-  },
-  btnText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
+  wrapper: { flex: 1, paddingTop: 60, paddingHorizontal: 20 },
+  title: { fontSize: 28, fontWeight: 'bold', textAlign: 'center', marginBottom: 20 },
+  tabs: { flexDirection: 'row', justifyContent: 'center', marginBottom: 20 },
+  tab: { paddingVertical: 10, paddingHorizontal: 20, borderRadius: 20, marginHorizontal: 5 },
+  tabText: { fontSize: 16 },
+  card: { flexDirection: 'row', padding: 16, borderRadius: 12, marginBottom: 16, alignItems: 'center', elevation: 2 },
+  icon: { marginRight: 16 },
+  cardContent: { flex: 1 },
+  itemTitle: { fontSize: 18, fontWeight: '600', marginBottom: 4 },
+  itemType: { fontSize: 14, marginBottom: 2 },
+  itemPoints: { fontSize: 14, marginBottom: 8 },
+  btn: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8, alignSelf: 'flex-start' },
+  btnText: { fontSize: 14, fontWeight: '500' },
   floatingBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 15,
-    position: 'absolute',
-    bottom: 110,
-    alignSelf: 'center',
-    paddingHorizontal: 20,
-    elevation: 5,
-    gap: 8,
+    flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 15,
+    position: 'absolute', bottom: 110, alignSelf: 'center', paddingHorizontal: 20, elevation: 5, gap: 8,
   },
-  floatingBtnText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
+  floatingBtnText: { fontSize: 16, fontWeight: '600', color: THEME.dark.text, },
   emptyWrap: { alignItems: 'center', marginTop: 24, gap: 10 },
   emptyTitle: { fontSize: 16, fontWeight: '600' },
+  
 });
