@@ -267,6 +267,47 @@ export function subscribePontoRecolhaById(
 
 // ===================== REPORTES =====================
 
+// 🔹 LISTA em tempo real de reportes (com filtro opcional por estado)
+export function subscribeReportes(args: {
+  statusIn?: ReporteStatus[]; // opcional
+  onData: (items: (ReporteDoc & { id: string })[]) => void;
+}): Unsubscribe {
+  const { statusIn, onData } = args;
+  let qy = query(reportesCol, orderBy('dataCriacao', 'desc'));
+  if (statusIn && statusIn.length) {
+    qy = query(reportesCol, where('status', 'in', statusIn), orderBy('dataCriacao', 'desc'));
+  }
+  return onSnapshot(qy, (snap) => {
+    const list = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })) as (ReporteDoc & { id: string })[];
+    onData(list);
+  });
+}
+
+// 🔹 DETALHE do reporte em tempo real
+export function subscribeReporteById(
+  id: string,
+  cb: (d: (ReporteDoc & { id: string }) | null) => void
+): Unsubscribe {
+  const ref = doc(reportesCol, id);
+  return onSnapshot(ref, (snap) => {
+    if (!snap.exists()) return cb(null);
+    cb({ id: snap.id, ...(snap.data() as any) } as ReporteDoc & { id: string });
+  });
+}
+
+// 🔹 Atualizar ESTADO do reporte
+export async function updateReporteStatus(
+  id: string,
+  status: ReporteStatus
+) {
+  const ref = doc(reportesCol, id);
+  await updateDoc(ref, {
+    status,
+    dataAtualizacao: serverTimestamp(),
+  });
+}
+
+
 export type ReporteStatus = 'aberto' | 'em_analise' | 'resolvido' | 'rejeitado';
 
 export type ReporteCreate = {
