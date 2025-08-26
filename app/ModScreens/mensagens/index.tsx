@@ -3,7 +3,7 @@ import {
   type ReporteStatus,
 } from '@/services/FirestoreService';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
@@ -44,12 +44,21 @@ const fsToLabel: Record<ReporteStatus, Estado> = {
 
 export default function MensagensModerador() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ estado?: 'Pendente' | 'Aprovado' | 'Reprovado' }>();
+
   const [q, setQ] = useState('');
   const [estadoFiltro, setEstadoFiltro] = useState<EstadoFiltro>('Todos');
   const [items, setItems] = useState<Item[]>([]);
   const [busy, setBusy] = useState(true);
 
-  // Subscrição aos reportes
+  // Aplica filtro inicial vindo por parâmetro (ex.: estado=Pendente)
+  useEffect(() => {
+    if (params?.estado === 'Pendente' || params?.estado === 'Aprovado' || params?.estado === 'Reprovado') {
+      setEstadoFiltro(params.estado);
+    }
+  }, [params?.estado]);
+
+  // Subscrição aos reportes (respeita o filtro)
   useEffect(() => {
     const statusIn = estadoFiltro === 'Todos' ? undefined : [labelToFs[estadoFiltro]];
     const unsub = subscribeReportes({
@@ -60,7 +69,7 @@ export default function MensagensModerador() {
           tipo: 'reporte',
           autor: r.criadoPorDisplay || 'Utilizador',
           titulo: r.tipo ? r.tipo.charAt(0).toUpperCase() + r.tipo.slice(1) : 'Reporte',
-          estado: fsToLabel[r.status],
+          estado: fsToLabel[r.status as ReporteStatus] ?? 'Pendente',
           data: r.dataCriacao?.toDate ? r.dataCriacao.toDate().toLocaleDateString() : '',
           fotoUrl: r.fotoUrl ?? undefined,
         }));

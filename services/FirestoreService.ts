@@ -14,7 +14,7 @@ import {
   serverTimestamp,
   setDoc,
   updateDoc,
-  where, // já importado
+  where,
   type Unsubscribe,
 } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -167,12 +167,12 @@ export async function addPontoRecolha(data: PontoRecolhaCreate): Promise<string>
   return docRef.id;
 }
 
-/** 🔹 NOVO: helper de ref para documento de ponto */
+/** 🔹 helper de ref para documento de ponto */
 export function pontoRecolhaDocRef(id: string) {
   return doc(pontoRecolhaCol, id);
 }
 
-/** 🔹 NOVO: UPDATE parcial de ponto (nome, residuos, endereco, localizacao, fotoUrl, status, ...) */
+/** 🔹 UPDATE parcial de ponto  */
 export async function updatePontoRecolha(
   id: string,
   data: Partial<PontoRecolhaCreate> & { status?: PontoRecolhaStatus }
@@ -183,7 +183,7 @@ export async function updatePontoRecolha(
   });
 }
 
-/** 🔹 NOVO: DELETE ponto */
+/** 🔹 DELETE ponto */
 export async function deletePontoRecolha(id: string) {
   await deleteDoc(pontoRecolhaDocRef(id));
 }
@@ -267,49 +267,7 @@ export function subscribePontoRecolhaById(
 
 // ===================== REPORTES =====================
 
-// 🔹 LISTA em tempo real de reportes (com filtro opcional por estado)
-export function subscribeReportes(args: {
-  statusIn?: ReporteStatus[]; // opcional
-  onData: (items: (ReporteDoc & { id: string })[]) => void;
-}): Unsubscribe {
-  const { statusIn, onData } = args;
-  let qy = query(reportesCol, orderBy('dataCriacao', 'desc'));
-  if (statusIn && statusIn.length) {
-    qy = query(reportesCol, where('status', 'in', statusIn), orderBy('dataCriacao', 'desc'));
-  }
-  return onSnapshot(qy, (snap) => {
-    const list = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })) as (ReporteDoc & { id: string })[];
-    onData(list);
-  });
-}
-
-// 🔹 DETALHE do reporte em tempo real
-export function subscribeReporteById(
-  id: string,
-  cb: (d: (ReporteDoc & { id: string }) | null) => void
-): Unsubscribe {
-  const ref = doc(reportesCol, id);
-  return onSnapshot(ref, (snap) => {
-    if (!snap.exists()) return cb(null);
-    cb({ id: snap.id, ...(snap.data() as any) } as ReporteDoc & { id: string });
-  });
-}
-
-// 🔹 Atualizar ESTADO do reporte
-export async function updateReporteStatus(
-  id: string,
-  status: ReporteStatus
-) {
-  const ref = doc(reportesCol, id);
-  await updateDoc(ref, {
-    status,
-    dataAtualizacao: serverTimestamp(),
-  });
-}
-
-
 export type ReporteStatus = 'pendente' | 'aprovado' | 'reprovado';
-
 
 export type ReporteCreate = {
   pontoId: string;                 // doc.id do pontoRecolha
@@ -338,6 +296,57 @@ export async function addReporte(data: ReporteCreate): Promise<string> {
   });
   return ref.id;
 }
+
+/** LISTA em tempo real de reportes (suporta statusEq e statusIn) */
+export function subscribeReportes(args: {
+  statusEq?: ReporteStatus;                 // igualdade (leve; ideal p/ KPIs)
+  statusIn?: ReporteStatus[];               // lista de estados
+  onData: (items: (ReporteDoc & { id: string })[]) => void;
+  onError?: (e: any) => void;
+}): Unsubscribe {
+  const { statusEq, statusIn, onData, onError } = args;
+
+  let qy = query(reportesCol);
+  if (statusEq) {
+    qy = query(qy, where('status', '==', statusEq));
+  } else if (statusIn && statusIn.length) {
+    qy = query(qy, where('status', 'in', statusIn));
+  }
+  qy = query(qy, orderBy('dataCriacao', 'desc'));
+
+  return onSnapshot(
+    qy,
+    (snap) => {
+      const list = snap.docs.map(
+        (d) => ({ id: d.id, ...(d.data() as any) })
+      ) as (ReporteDoc & { id: string })[];
+      onData(list);
+    },
+    (err) => {
+      console.error('[subscribeReportes] onSnapshot error:', err);
+      onError?.(err);
+    }
+  );
+}
+
+/** DETALHE do reporte em tempo real */
+export function subscribeReporteById(
+  id: string,
+  cb: (d: (ReporteDoc & { id: string }) | null) => void
+): Unsubscribe {
+  const ref = doc(reportesCol, id);
+  return onSnapshot(ref, (snap) => {
+    if (!snap.exists()) return cb(null);
+    cb({ id: snap.id, ...(snap.data() as any) } as ReporteDoc & { id: string });
+  });
+}
+
+/** Atualizar ESTADO do reporte */
+export async function updateReporteStatus(id: string, status: ReporteStatus) {
+  const ref = doc(reportesCol, id);
+  await updateDoc(ref, { status, dataAtualizacao: serverTimestamp() });
+}
+
 
 // ===================== STATS POR UTILIZADOR =====================
 
@@ -429,7 +438,6 @@ function pruneUndefined<T extends Record<string, any>>(obj: T): T {
 export async function addRetoma(data: RetomaCreate): Promise<string> {
   const cleaned = pruneUndefined({
     ...data,
-    // normalizações finais
     fotoUrl: data.fotoUrl ?? null,
     lat: data.lat ?? null,
     lng: data.lng ?? null,

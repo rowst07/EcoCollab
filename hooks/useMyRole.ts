@@ -1,4 +1,4 @@
-// app/hooks/useMyRole.ts
+
 import { getUserMinimalDoc, subscribeUserDoc, type Role } from '@/services/FirestoreService';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { useEffect, useState } from 'react';
@@ -20,13 +20,13 @@ export function useMyRole() {
         return;
       }
 
-      // leitura única (fallback útil caso as rules bloqueiem a subscrição)
+      // leitura única 
       try {
         const doc = await getUserMinimalDoc(user.uid);
         setRole((doc?.role as Role) ?? null);
       } catch { /* ignore */ }
 
-      // subscrição em tempo-real ao /users/{uid}
+      // subscrição em tempo-real ao firebase
       unsubUser = subscribeUserDoc(user.uid, (u) => {
         setRole((u?.role as Role) ?? null);
         setLoading(false);
