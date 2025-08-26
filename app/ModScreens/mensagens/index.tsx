@@ -16,9 +16,9 @@ import {
   View
 } from 'react-native';
 
-type Estado = 'Análise' | 'Resolvido' | 'Irrelevante';
+type Estado = 'Pendente' | 'Aprovado' | 'Reprovado';
 type EstadoFiltro = 'Todos' | Estado;
-type TipoMsg = 'reporte'; // (podemos juntar 'ponto' no futuro)
+type TipoMsg = 'reporte';
 
 type Item = {
   id: string;
@@ -32,15 +32,14 @@ type Item = {
 
 // Mapeamentos Firestore <-> UI
 const labelToFs: Record<Estado, ReporteStatus> = {
-  'Análise': 'em_analise',
-  'Resolvido': 'resolvido',
-  'Irrelevante': 'rejeitado',
+  'Pendente': 'pendente',
+  'Aprovado': 'aprovado',
+  'Reprovado': 'reprovado',
 };
 const fsToLabel: Record<ReporteStatus, Estado> = {
-  'em_analise': 'Análise',
-  'resolvido': 'Resolvido',
-  'rejeitado': 'Irrelevante',
-  'aberto': 'Análise', // fallback visual
+  'pendente': 'Pendente',
+  'aprovado': 'Aprovado',
+  'reprovado': 'Reprovado',
 };
 
 export default function MensagensModerador() {
@@ -61,7 +60,7 @@ export default function MensagensModerador() {
           tipo: 'reporte',
           autor: r.criadoPorDisplay || 'Utilizador',
           titulo: r.tipo ? r.tipo.charAt(0).toUpperCase() + r.tipo.slice(1) : 'Reporte',
-          estado: fsToLabel[r.status] ?? 'Análise',
+          estado: fsToLabel[r.status],
           data: r.dataCriacao?.toDate ? r.dataCriacao.toDate().toLocaleDateString() : '',
           fotoUrl: r.fotoUrl ?? undefined,
         }));
@@ -82,9 +81,9 @@ export default function MensagensModerador() {
 
   const EstadoChip = ({ value }: { value: Estado }) => {
     const st =
-      value === 'Resolvido' ? styles.chipDone :
-      value === 'Análise'   ? styles.chipProg :
-      value === 'Irrelevante' ? styles.chipIrrel :
+      value === 'Aprovado' ? styles.chipDone :
+      value === 'Pendente' ? styles.chipProg :
+      value === 'Reprovado' ? styles.chipIrrel :
       styles.chipNeutral;
     return <Text style={[styles.chip, st]}>{value}</Text>;
   };
@@ -132,7 +131,7 @@ export default function MensagensModerador() {
 
       {/* Filtros por estado */}
       <View style={styles.filtersRow}>
-        {(['Todos', 'Análise', 'Resolvido', 'Irrelevante'] as EstadoFiltro[]).map(l =>
+        {(['Todos', 'Pendente', 'Aprovado', 'Reprovado'] as EstadoFiltro[]).map(l =>
           <Filtro key={l} label={l} />
         )}
       </View>
@@ -214,13 +213,7 @@ const styles = StyleSheet.create({
   },
   searchInput: { marginLeft: 8, flex: 1, color: '#111' },
 
-  filtersRow: {
-    flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 16,
-    marginTop: 10,
-    marginBottom: 2
-  },
+  filtersRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginTop: 10, marginBottom: 2 },
   filter: { backgroundColor: '#E8F1EA', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 16 },
   filterActive: { backgroundColor: '#2E7D32' },
   filterText: { color: '#2E7D32', fontWeight: '700' },
@@ -246,8 +239,8 @@ const styles = StyleSheet.create({
   cardMeta: { marginLeft: 6, color: '#666' },
 
   chip: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 12, fontWeight: '800', color: '#fff', fontSize: 12 },
-  chipDone: { backgroundColor: '#2E7D32' },
-  chipProg: { backgroundColor: '#FFA000' },
-  chipIrrel: { backgroundColor: '#D32F2F' },
+  chipDone: { backgroundColor: '#2E7D32' },  // Aprovado
+  chipProg: { backgroundColor: '#FFA000' },  // Pendente
+  chipIrrel: { backgroundColor: '#D32F2F' }, // Reprovado
   chipNeutral: { backgroundColor: '#9E9E9E' },
 });

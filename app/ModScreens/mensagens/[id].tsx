@@ -10,17 +10,18 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 // Estados (UI) e mapeamentos Firestore
-type Estado = 'Análise' | 'Resolvido' | 'Irrelevante';
+type Estado = 'Pendente' | 'Aprovado' | 'Reprovado';
+
 const labelToFs: Record<Estado, ReporteStatus> = {
-  'Análise': 'em_analise',
-  'Resolvido': 'resolvido',
-  'Irrelevante': 'rejeitado',
+  'Pendente': 'pendente',
+  'Aprovado': 'aprovado',
+  'Reprovado': 'reprovado',
 };
+
 const fsToLabel: Record<ReporteStatus, Estado> = {
-  'em_analise': 'Análise',
-  'resolvido': 'Resolvido',
-  'rejeitado': 'Irrelevante',
-  'aberto': 'Análise',
+  'pendente': 'Pendente',
+  'aprovado': 'Aprovado',
+  'reprovado': 'Reprovado',
 };
 
 export default function MensagemDetalhe() {
@@ -34,7 +35,7 @@ export default function MensagemDetalhe() {
   const [dataStr, setDataStr] = useState<string>('');
   const [imagem, setImagem] = useState<string | undefined>(undefined);
   const [morada, setMorada] = useState<string | undefined>(undefined);
-  const [estado, setEstado] = useState<Estado>('Análise');
+  const [estado, setEstado] = useState<Estado>('Pendente');
   const [pontoId, setPontoId] = useState<string | undefined>(undefined);
 
   // Carrega reporte + (opcional) morada do ponto associado
@@ -50,7 +51,12 @@ export default function MensagemDetalhe() {
       setAutor(r.criadoPorDisplay || 'Utilizador');
       setDataStr(r.dataCriacao?.toDate ? r.dataCriacao.toDate().toLocaleDateString() : '');
       setImagem(r.fotoUrl ?? undefined);
-      setEstado(fsToLabel[r.status] ?? 'Análise');
+      // mapear estado Firestore -> UI
+      if (r.status && (r.status in fsToLabel)) {
+        setEstado(fsToLabel[r.status as ReporteStatus]);
+      } else {
+        setEstado('Pendente'); // fallback
+      }
       setPontoId(r.pontoId); // pode ser undefined
       setLoading(false);
     });
@@ -71,7 +77,7 @@ export default function MensagemDetalhe() {
     <Text
       style={[
         styles.chip,
-        v === 'Resolvido' ? styles.chipDone : v === 'Análise' ? styles.chipProg : styles.chipIrrel,
+        v === 'Aprovado' ? styles.chipDone : v === 'Pendente' ? styles.chipProg : styles.chipIrrel,
       ]}
     >
       {v}
@@ -85,25 +91,25 @@ export default function MensagemDetalhe() {
     ]);
 
   // Ações — gravam no Firestore
-  const enviarParaAnalise = () =>
-    confirm('Enviar para análise?', async () => {
-      await updateReporteStatus(String(id), labelToFs['Análise']);
-      setEstado('Análise');
-      Alert.alert('Enviado', 'Marcado para análise.');
+  const marcarPendente = () =>
+    confirm('Marcar como pendente?', async () => {
+      await updateReporteStatus(String(id), labelToFs['Pendente']);
+      setEstado('Pendente');
+      Alert.alert('Atualizado', 'Marcado como pendente.');
     });
 
-  const marcarResolvido = () =>
-    confirm('Marcar como resolvido?', async () => {
-      await updateReporteStatus(String(id), labelToFs['Resolvido']);
-      setEstado('Resolvido');
-      Alert.alert('Atualizado', 'Marcado como resolvido.');
+  const marcarAprovado = () =>
+    confirm('Marcar como aprovado?', async () => {
+      await updateReporteStatus(String(id), labelToFs['Aprovado']);
+      setEstado('Aprovado');
+      Alert.alert('Atualizado', 'Marcado como aprovado.');
     });
 
-  const marcarIrrelevante = () =>
-    confirm('Marcar como irrelevante?', async () => {
-      await updateReporteStatus(String(id), labelToFs['Irrelevante']);
-      setEstado('Irrelevante');
-      Alert.alert('Atualizado', 'Marcado como irrelevante.');
+  const marcarReprovado = () =>
+    confirm('Marcar como reprovado?', async () => {
+      await updateReporteStatus(String(id), labelToFs['Reprovado']);
+      setEstado('Reprovado');
+      Alert.alert('Atualizado', 'Marcado como reprovado.');
     });
 
   const guardarAlteracoes = async () => {
@@ -153,19 +159,19 @@ export default function MensagemDetalhe() {
           </>
         ) : null}
 
-        {/* Botões de ação (reporte) */}
+        {/* Botões de ação */}
         <View style={styles.actions}>
-          <TouchableOpacity style={[styles.btn, styles.red]} onPress={marcarIrrelevante}>
+          <TouchableOpacity style={[styles.btn, styles.red]} onPress={marcarReprovado}>
             <Ionicons name="close-circle-outline" size={18} color="#fff" />
-            <Text style={styles.btnText}>Irrelevante</Text>
+            <Text style={styles.btnText}>Reprovado</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.btn, styles.amber]} onPress={enviarParaAnalise}>
+          <TouchableOpacity style={[styles.btn, styles.amber]} onPress={marcarPendente}>
             <Ionicons name="alert-circle-outline" size={18} color="#fff" />
-            <Text style={styles.btnText}>Análise</Text>
+            <Text style={styles.btnText}>Pendente</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.btn, styles.green]} onPress={marcarResolvido}>
+          <TouchableOpacity style={[styles.btn, styles.green]} onPress={marcarAprovado}>
             <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
-            <Text style={styles.btnText}>Resolvido</Text>
+            <Text style={styles.btnText}>Aprovado</Text>
           </TouchableOpacity>
         </View>
 
@@ -203,9 +209,9 @@ const styles = StyleSheet.create({
   green: { backgroundColor: '#2E7D32' },
 
   chip: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 12, fontWeight: '800', color: '#fff', fontSize: 12 },
-  chipDone: { backgroundColor: '#2E7D32' },
-  chipProg: { backgroundColor: '#FFA000' },
-  chipIrrel: { backgroundColor: '#D32F2F' },
+  chipDone: { backgroundColor: '#2E7D32' },  // Aprovado
+  chipProg: { backgroundColor: '#FFA000' },  // Pendente
+  chipIrrel: { backgroundColor: '#D32F2F' }, // Reprovado
 
   btnGhost: { flex: 1, borderRadius: 12, borderWidth: 1, borderColor: '#DDD', alignItems: 'center', justifyContent: 'center', paddingVertical: 12 },
   btnGhostText: { fontWeight: '800', color: '#333' },

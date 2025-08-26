@@ -308,7 +308,8 @@ export async function updateReporteStatus(
 }
 
 
-export type ReporteStatus = 'aberto' | 'em_analise' | 'resolvido' | 'rejeitado';
+export type ReporteStatus = 'pendente' | 'aprovado' | 'reprovado';
+
 
 export type ReporteCreate = {
   pontoId: string;                 // doc.id do pontoRecolha
@@ -317,7 +318,7 @@ export type ReporteCreate = {
   fotoUrl?: string | null;
   criadoPor: string;               // uid
   criadoPorDisplay?: string | null;
-  status: ReporteStatus;           // 'aberto' na criação
+  status: ReporteStatus;           // 'pendente' na criação
 };
 
 export type ReporteDoc = ReporteCreate & {
