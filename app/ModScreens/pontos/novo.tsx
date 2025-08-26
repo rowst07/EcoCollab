@@ -1,4 +1,7 @@
+import { useAuth } from '@/services/AuthContext';
+import { addPontoRecolha, type PontoRecolhaCreate } from '@/services/FirestoreService';
 import { useRouter } from 'expo-router';
+import { GeoPoint } from 'firebase/firestore';
 import React, { useState } from 'react';
 import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
@@ -7,15 +10,50 @@ type Tipo = typeof ALL_TIPOS[number];
 
 export default function NovoPonto() {
   const router = useRouter();
+  const { user } = useAuth();
+
   const [nome, setNome] = useState('');
   const [morada, setMorada] = useState('');
   const [tipos, setTipos] = useState<Tipo[]>([]);
   const [lat, setLat] = useState(''); const [lng, setLng] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const toggle = (t: Tipo) => setTipos(prev => prev.includes(t) ? prev.filter(x=>x!==t) : [...prev, t]);
-  const onCriar = () => {
-    if (!nome.trim()) return Alert.alert('Nome obrigatório');
-    Alert.alert('Criado', `Ponto "${nome}" criado.`); router.back();
+
+  const onCriar = async () => {
+    try {
+      if (!nome.trim()) return Alert.alert('Nome obrigatório');
+      const latN = Number(lat), lngN = Number(lng);
+      if (!Number.isFinite(latN) || !Number.isFinite(lngN)) {
+        return Alert.alert('Coordenadas inválidas', 'Introduz latitude/longitude válidas.');
+      }
+      if (!tipos.length) return Alert.alert('Seleciona pelo menos um tipo de resíduo');
+
+      if (!user?.uid) return Alert.alert('Sessão inválida', 'Volta a iniciar sessão.');
+
+      setSaving(true);
+
+      const payload: PontoRecolhaCreate = {
+        nome: nome.trim(),
+        descricao: '',
+        endereco: morada.trim() || undefined,
+        residuos: tipos as string[],
+        localizacao: new GeoPoint(latN, lngN),
+        fotoUrl: null,
+        criadoPor: user.uid,
+        criadoPorDisplay: user.displayName || user.email || 'Utilizador',
+        status: 'pendente',
+      };
+
+      const id = await addPontoRecolha(payload);
+
+      Alert.alert('Criado', `Ponto "${nome}" criado.`);
+      router.replace(`/ModScreens/pontos/editar/${id}`);
+    } catch (e: any) {
+      Alert.alert('Erro a criar ponto', String(e?.message || e));
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -50,11 +88,11 @@ export default function NovoPonto() {
         </View>
 
         <View style={{ flexDirection:'row', gap:10, marginTop:14 }}>
-          <TouchableOpacity style={[styles.btn, styles.cancel]} onPress={() => router.back()}>
+          <TouchableOpacity style={[styles.btn, styles.cancel]} onPress={() => router.back()} disabled={saving}>
             <Text style={styles.btnText}>Cancelar</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.btn, styles.save]} onPress={onCriar}>
-            <Text style={styles.btnText}>Criar</Text>
+          <TouchableOpacity style={[styles.btn, styles.save]} onPress={onCriar} disabled={saving}>
+            <Text style={styles.btnText}>{saving ? 'A criar…' : 'Criar'}</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

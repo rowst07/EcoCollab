@@ -1,22 +1,38 @@
+import { subscribePontosRecolha, type PontoMarker } from '@/services/FirestoreService';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { FlatList, Image, SafeAreaView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-
-const PONTOS = [
-  { id: 'p1', nome: 'Ecoponto Centro', tipos: ['vidro'] },
-  { id: 'p2', nome: 'Ecoponto Escola', tipos: ['papel','plastico','metal'] },
-  { id: 'p3', nome: 'Ecoponto Mercado', tipos: ['organico','vidro'] },
-];
 
 export default function GestaoPontos() {
   const router = useRouter();
   const [q, setQ] = useState('');
+  const [items, setItems] = useState<PontoMarker[]>([]);
+  const [busy, setBusy] = useState(true);
 
-  const data = useMemo(() => PONTOS.filter(p => p.nome.toLowerCase().includes(q.toLowerCase())), [q]);
+  useEffect(() => {
+    const unsub = subscribePontosRecolha({
+      onData: (markers) => {
+        setItems(markers);
+        setBusy(false);
+      },
+    });
+    return unsub;
+  }, []);
+
+  const filtered = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    if (!term) return items;
+    return items.filter((p) =>
+      (p.nome || '').toLowerCase().includes(term) ||
+      (p.morada || '').toLowerCase().includes(term) ||
+      p.tipos?.some((t) => (t || '').toLowerCase().includes(term)) ||
+      (p.status || '').toLowerCase().includes(term)
+    );
+  }, [items, q]);
 
   const TipoCirculo = ({ t }: { t: string }) => {
-    const cores: Record<string,string> = {
+    const cores: Record<string, string> = {
       papel:'#2196F3', plastico:'#FFEB3B', vidro:'#4CAF50', pilhas:'#F44336', organico:'#795548', metal:'#9E9E9E', outros:'#9C27B0'
     };
     return <View style={{ width:14,height:14,borderRadius:7, marginRight:6, backgroundColor: cores[t] || cores.outros, borderWidth:1, borderColor:'#00000020' }} />;
@@ -53,19 +69,25 @@ export default function GestaoPontos() {
 
       <FlatList
         contentContainerStyle={{ paddingHorizontal:16, paddingTop:10, paddingBottom:16 }}
-        data={data}
+        data={filtered}
         keyExtractor={(i) => i.id}
+        refreshing={busy}
+        onRefresh={() => {/* live, noop */}}
         renderItem={({ item }) => (
-          <TouchableOpacity style={styles.card} onPress={() => router.push(`/ModScreens/pontos/editar/${item.id}`)}>
+          <TouchableOpacity
+            style={styles.card}
+            onPress={() => router.push(`/ModScreens/pontos/editar/${item.id}`)}
+          >
             <Text style={styles.cardTitle}>{item.nome}</Text>
+            {item.morada ? <Text style={{ color:'#555', marginTop:4 }} numberOfLines={1}>{item.morada}</Text> : null}
             <View style={{ flexDirection:'row', alignItems:'center', marginTop:6 }}>
-              {item.tipos.map((t, i) => <TipoCirculo key={`${item.id}-${t}-${i}`} t={t} />)}
+              {item.tipos?.map((t, i) => <TipoCirculo key={`${item.id}-${t}-${i}`} t={t} />)}
             </View>
             <Ionicons name="chevron-forward" size={20} color="#2E7D32" style={{ position:'absolute', right:12, top:14 }} />
           </TouchableOpacity>
         )}
         ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
-        ListEmptyComponent={<Text style={{ textAlign:'center', color:'#666', marginTop:30 }}>Sem pontos.</Text>}
+        ListEmptyComponent={<Text style={{ textAlign:'center', color:'#666', marginTop:30 }}>{busy ? 'A carregar…' : 'Sem pontos.'}</Text>}
       />
     </SafeAreaView>
   );
@@ -74,9 +96,8 @@ export default function GestaoPontos() {
 const styles = StyleSheet.create({
   container:{ flex:1, backgroundColor:'#fff' },
 
-  // brand bar
-   brandBar: {
-    backgroundColor: '#EFEADB',          // bege do mockup
+  brandBar: {
+    backgroundColor: '#EFEADB',
     alignItems: 'center',
     paddingTop: 0,
     paddingBottom: 1,

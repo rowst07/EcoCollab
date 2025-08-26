@@ -3,6 +3,7 @@ import { User } from 'firebase/auth';
 import {
   addDoc,
   collection,
+  deleteDoc,
   doc,
   GeoPoint,
   getDoc,
@@ -13,7 +14,7 @@ import {
   serverTimestamp,
   setDoc,
   updateDoc,
-  where,
+  where, // já importado
   type Unsubscribe,
 } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -98,7 +99,7 @@ export function subscribeUserDoc(
   });
 }
 
-/** 🔹 NOVO: Subscrição em tempo real à LISTA de utilizadores (ordenada por nome) — só leitura. */
+/** Subscrição em tempo real à LISTA de utilizadores (ordenada por nome) — só leitura. */
 export function subscribeUsers(
   onData: (users: (UserMinimalDoc & UserExtras)[]) => void
 ): Unsubscribe {
@@ -112,7 +113,7 @@ export function subscribeUsers(
   });
 }
 
-/** 🔹 NOVO: Subscrição em tempo real ao PERFIL de um utilizador por ID — só leitura. */
+/** Subscrição em tempo real ao PERFIL de um utilizador por ID — só leitura. */
 export function subscribeUserById(
   uid: string,
   onData: (user: (UserMinimalDoc & UserExtras) | null) => void
@@ -164,6 +165,27 @@ export async function addPontoRecolha(data: PontoRecolhaCreate): Promise<string>
     dataAtualizacao: serverTimestamp(),
   });
   return docRef.id;
+}
+
+/** 🔹 NOVO: helper de ref para documento de ponto */
+export function pontoRecolhaDocRef(id: string) {
+  return doc(pontoRecolhaCol, id);
+}
+
+/** 🔹 NOVO: UPDATE parcial de ponto (nome, residuos, endereco, localizacao, fotoUrl, status, ...) */
+export async function updatePontoRecolha(
+  id: string,
+  data: Partial<PontoRecolhaCreate> & { status?: PontoRecolhaStatus }
+) {
+  await updateDoc(pontoRecolhaDocRef(id), {
+    ...data,
+    dataAtualizacao: serverTimestamp(),
+  });
+}
+
+/** 🔹 NOVO: DELETE ponto */
+export async function deletePontoRecolha(id: string) {
+  await deleteDoc(pontoRecolhaDocRef(id));
 }
 
 /** Shape usado pelo ecrã do mapa (HomeUser) */

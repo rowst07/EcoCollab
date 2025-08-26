@@ -46,13 +46,13 @@ export default function ModHome() {
       <Card
         icon="chatbubbles-outline"
         title="Mensagens"
-        subtitle="Ver e tratar reportes dos membros"
+        subtitle="Ver e tratar reportes de utilizadores"
         to="/ModScreens/mensagens"
       />
       <Card
         icon="people-outline"
-        title="Gestão de Utilizadores"
-        subtitle="Editar, remover e ver detalhes"
+        title="Visualização Utilizadores"
+        subtitle="Visualizar detalhes sobre utilizadores"
         to="/ModScreens/utilizadores"
       />
       <Card

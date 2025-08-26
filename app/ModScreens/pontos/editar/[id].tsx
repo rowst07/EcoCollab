@@ -1,6 +1,12 @@
+import {
+  deletePontoRecolha,
+  subscribePontoRecolhaById,
+  updatePontoRecolha
+} from '@/services/FirestoreService';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
-import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { GeoPoint } from 'firebase/firestore';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 const ALL_TIPOS = ['vidro','papel','plastico','metal','pilhas','organico','outros'] as const;
 type Tipo = typeof ALL_TIPOS[number];
@@ -9,48 +15,90 @@ export default function EditarPonto() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
 
-  // ⚠️ MOCK: substituir por fetch ao carregar
-  const inicial = useMemo(() => ({
-    id,
-    nome: 'Ecoponto Centro',
-    tipos: ['vidro','papel'] as Tipo[],
-    morada: 'Centro, Bragança',
-    lat: '41.805',
-    lng: '-6.756',
-  }), [id]);
+  const [loading, setLoading] = useState(true);
+  const [nome, setNome] = useState('');
+  const [morada, setMorada] = useState('');
+  const [tipos, setTipos] = useState<Tipo[]>([]);
+  const [lat, setLat] = useState<string>('');
+  const [lng, setLng] = useState<string>('');
 
-  const [nome, setNome] = useState(inicial.nome);
-  const [morada, setMorada] = useState(inicial.morada);
-  const [tipos, setTipos] = useState<Tipo[]>(inicial.tipos);
-  const [lat, setLat] = useState<string>(inicial.lat);
-  const [lng, setLng] = useState<string>(inicial.lng);
+  useEffect(() => {
+    if (!id) return;
+    const unsub = subscribePontoRecolhaById(id, (p) => {
+      if (!p) {
+        setLoading(false);
+        return;
+      }
+      setNome(p.nome || '');
+      setMorada(p.morada || '');
+      setTipos((p.tipos || []) as Tipo[]);
+      setLat(String(p.latitude ?? ''));
+      setLng(String(p.longitude ?? ''));
+      setLoading(false);
+    });
+    return unsub;
+  }, [id]);
 
   const toggleTipo = (t: Tipo) => {
     setTipos(prev => prev.includes(t) ? prev.filter(x => x!==t) : [...prev, t]);
   };
 
-  const onGuardar = () => {
-    if (!nome.trim()) return Alert.alert('Nome obrigatório');
-    // 👉 integra API para atualizar
-    Alert.alert('Guardado', `Ponto #${id} atualizado.`);
-    router.back();
+  const onGuardar = async () => {
+    try {
+      if (!id) return;
+      if (!nome.trim()) return Alert.alert('Nome obrigatório');
+
+      const latN = Number(lat), lngN = Number(lng);
+      if (!Number.isFinite(latN) || !Number.isFinite(lngN)) {
+        return Alert.alert('Coordenadas inválidas', 'Introduz latitude/longitude válidas.');
+      }
+
+      await updatePontoRecolha(id, {
+        nome: nome.trim(),
+        endereco: morada.trim() || undefined,
+        residuos: tipos as string[],
+        localizacao: new GeoPoint(latN, lngN),
+      });
+
+      Alert.alert('Guardado', `Ponto #${id} atualizado.`);
+      router.back();
+    } catch (e: any) {
+      Alert.alert('Erro ao guardar', String(e?.message || e));
+    }
   };
 
   const onEliminar = () => {
+    if (!id) return;
     Alert.alert(
       'Eliminar ponto?',
       'Esta ação é permanente.',
       [
         { text: 'Cancelar', style: 'cancel' },
-        { text: 'Eliminar', style: 'destructive', onPress: () => {
-            // 👉 integra API para eliminar
-            Alert.alert('Eliminado', `Ponto #${id} eliminado.`);
-            router.replace('/ModScreens/pontos');
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deletePontoRecolha(id);
+              Alert.alert('Eliminado', `Ponto #${id} eliminado.`);
+              router.replace('/ModScreens/pontos');
+            } catch (e: any) {
+              Alert.alert('Erro ao eliminar', String(e?.message || e));
+            }
           }
         },
       ]
     );
   };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={{ flex:1, backgroundColor:'#fff', alignItems:'center', justifyContent:'center' }}>
+        <ActivityIndicator />
+        <Text style={{ marginTop:8 }}>A carregar…</Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={{ flex:1, backgroundColor:'#fff' }}>
