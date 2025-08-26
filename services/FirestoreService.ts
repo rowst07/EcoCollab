@@ -88,7 +88,7 @@ export async function updateUserExtrasDoc(uid: string, extras: UserExtras) {
   });
 }
 
-/** Subscrição em tempo-real ao doc do utilizador. */
+/** Subscrição em tempo-real ao doc do utilizador autenticado (helpers existentes). */
 export function subscribeUserDoc(
   uid: string,
   callback: (data: (UserMinimalDoc & UserExtras) | null) => void
@@ -96,6 +96,40 @@ export function subscribeUserDoc(
   return onSnapshot(userRef(uid), (snap) => {
     callback(snap.exists() ? (snap.data() as UserMinimalDoc & UserExtras) : null);
   });
+}
+
+/** 🔹 NOVO: Subscrição em tempo real à LISTA de utilizadores (ordenada por nome) — só leitura. */
+export function subscribeUsers(
+  onData: (users: (UserMinimalDoc & UserExtras)[]) => void
+): Unsubscribe {
+  const colRef = collection(db, 'users');
+  const qy = query(colRef, orderBy('nome', 'asc'));
+  return onSnapshot(qy, (snap) => {
+    const list = snap.docs.map(
+      (d) => ({ id: d.id, ...(d.data() as any) }) as UserMinimalDoc & UserExtras
+    );
+    onData(list);
+  });
+}
+
+/** 🔹 NOVO: Subscrição em tempo real ao PERFIL de um utilizador por ID — só leitura. */
+export function subscribeUserById(
+  uid: string,
+  onData: (user: (UserMinimalDoc & UserExtras) | null) => void
+): Unsubscribe {
+  return onSnapshot(userRef(uid), (snap) => {
+    onData(snap.exists() ? (({ id: snap.id, ...(snap.data() as any) }) as UserMinimalDoc & UserExtras) : null);
+  });
+}
+
+/** (Opcional) Leitura única de TODOS os utilizadores, ordenados por nome — útil para pré-carregar. */
+export async function getAllUsersOnce(): Promise<(UserMinimalDoc & UserExtras)[]> {
+  const colRef = collection(db, 'users');
+  const qy = query(colRef, orderBy('nome', 'asc'));
+  const s = await getDocs(qy);
+  return s.docs.map(
+    (d) => ({ id: d.id, ...(d.data() as any) }) as UserMinimalDoc & UserExtras
+  );
 }
 
 // ===================== PONTOS DE RECOLHA =====================
