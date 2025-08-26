@@ -5,9 +5,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import MapView, { Callout, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 
-// 🔥 serviço Firestore (novas funções abaixo)
+// 🔥 serviço Firestore
 import { MAP_STYLE_DARK } from '@/constants/Map';
 import { subscribePontosRecolha, type PontoMarker } from '@/services/FirestoreService';
+
+// ✅ hook de role
+import { useMyRole } from '@/hooks/useMyRole';
 
 const cores: Record<string, string> = {
   papel: '#2196F3',
@@ -36,6 +39,9 @@ export default function HomeUser() {
     classificacao: 'todos',
   });
 
+  // 👤 role via hook
+  const { isModerator, isAdmin, loading } = useMyRole();
+
   useEffect(() => {
     const unsub = subscribePontosRecolha({
       statusEq: 'aprovado',
@@ -63,10 +69,7 @@ export default function HomeUser() {
   }, [ecopontos, pesquisa, filtros]);
 
   const abrirDetalhes = (eco: PontoMarker) => {
-    router.push({
-      pathname: '/UserScreens/detalhesEcoponto',
-      params: { id: eco.id },
-    });
+    router.push({ pathname: '/UserScreens/detalhesEcoponto', params: { id: eco.id } });
   };
 
   const renderCirculosTipos = (eco: PontoMarker) => {
@@ -74,10 +77,7 @@ export default function HomeUser() {
     return (
       <View style={styles.circulosRow}>
         {tipos.map((t, idx) => (
-          <View
-            key={idx}
-            style={[styles.circulo, { backgroundColor: cores[t] || cores.outros }]}
-          />
+          <View key={idx} style={[styles.circulo, { backgroundColor: cores[t] || cores.outros }]} />
         ))}
       </View>
     );
@@ -85,10 +85,9 @@ export default function HomeUser() {
 
   const renderEstrelas = (n: number | undefined) => {
     const score = Math.max(0, Math.min(5, Math.floor(n ?? 0)));
-    const arr = [1, 2, 3, 4, 5];
     return (
       <View style={styles.estrelasRow}>
-        {arr.map((i) => (
+        {[1, 2, 3, 4, 5].map((i) => (
           <Ionicons
             key={i}
             name={i <= score ? 'star' : 'star-outline'}
@@ -112,7 +111,7 @@ export default function HomeUser() {
         </TouchableOpacity>
       </View>
 
-      {/* Mapa (tema escuro) */}
+      {/* Mapa */}
       <MapView
         provider={PROVIDER_GOOGLE}
         style={{ flex: 1 }}
@@ -124,35 +123,21 @@ export default function HomeUser() {
         }}
         customMapStyle={MAP_STYLE_DARK}
         loadingEnabled
-        onMapReady={() => console.log('[Map] ready')}
-        onMapLoaded={() => console.log('[Map] loaded')}
       >
         {filtrados.map((e) => (
-          <Marker
-            key={e.id}
-            coordinate={{ latitude: e.latitude, longitude: e.longitude }}
-          >
-            <Callout
-              tooltip
-              onPress={() => abrirDetalhes(e)}       // iOS/Android fiável
-            >
+          <Marker key={e.id} coordinate={{ latitude: e.latitude, longitude: e.longitude }}>
+            <Callout tooltip onPress={() => abrirDetalhes(e)}>
               <View style={styles.calloutCard}>
                 <Text style={styles.calloutTitle}>{e.nome}</Text>
 
-                {/* Resíduos (círculos coloridos) */}
                 {renderCirculosTipos(e)}
 
-                {/* Classificação */}
                 <View style={styles.classRow}>
                   {renderEstrelas(e.classificacao)}
                   <Text style={styles.classText}>{(e.classificacao ?? 0).toFixed(1)}</Text>
                 </View>
 
-                {/* Botão visual */}
-                <TouchableOpacity
-                  style={styles.infoBtn}
-                  onPress={() => abrirDetalhes(e)}   // reforço do onPress no conteúdo do callout
-                >
+                <TouchableOpacity style={styles.infoBtn} onPress={() => abrirDetalhes(e)}>
                   <Ionicons name="information-circle" size={18} color="#fff" />
                   <Text style={styles.infoBtnText}>Detalhes</Text>
                 </TouchableOpacity>
@@ -163,22 +148,16 @@ export default function HomeUser() {
       </MapView>
 
       {/* Botão flutuante para criar novo ponto */}
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => router.push('/UserScreens/criarEcoponto')}
-      >
+      <TouchableOpacity style={styles.fab} onPress={() => router.push('/UserScreens/criarEcoponto')}>
         <Ionicons name="add" size={28} color="#fff" />
       </TouchableOpacity>
 
-      {/* Botão “Painel de Moderador” */}
-      <TouchableOpacity
-        style={styles.modBtn}
-        onPress={() => router.push('/ModScreens')}
-        accessibilityRole="button"
-        accessibilityLabel="Abrir painel de moderador"
-      >
-        <Text style={styles.modBtnText}>Painel de Moderador</Text>
-      </TouchableOpacity>
+      {/* Botão Painel Moderador/Admin */}
+      {!loading && (isModerator || isAdmin) && (
+        <TouchableOpacity style={styles.modBtn} onPress={() => router.push('/ModScreens')}>
+          <Text style={styles.modBtnText}>Painel de Moderador</Text>
+        </TouchableOpacity>
+      )}
 
       {/* Modal de Pesquisa */}
       <PesquisaModal
@@ -220,13 +199,8 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 2,
   },
-  searchPlaceholder: {
-    marginLeft: 8,
-    color: '#bdbdbd',
-    fontSize: 16,
-  },
+  searchPlaceholder: { marginLeft: 8, color: '#bdbdbd', fontSize: 16 },
 
-  // Callout
   calloutCard: {
     minWidth: 230,
     maxWidth: 260,
@@ -241,16 +215,8 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 2,
   },
-  calloutTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#f2f2f2',
-    marginBottom: 6,
-  },
-  circulosRow: {
-    flexDirection: 'row',
-    marginBottom: 6,
-  },
+  calloutTitle: { fontSize: 16, fontWeight: '700', color: '#f2f2f2', marginBottom: 6 },
+  circulosRow: { flexDirection: 'row', marginBottom: 6 },
   circulo: {
     width: 16,
     height: 16,
@@ -259,19 +225,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#00000040',
   },
-  classRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  estrelasRow: {
-    flexDirection: 'row',
-    marginRight: 6,
-  },
-  classText: {
-    color: '#d0d0d0',
-    fontWeight: '600',
-  },
+  classRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  estrelasRow: { flexDirection: 'row', marginRight: 6 },
+  classText: { color: '#d0d0d0', fontWeight: '600' },
   infoBtn: {
     backgroundColor: '#2E7D32',
     borderRadius: 10,
@@ -283,13 +239,8 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginTop: 8,
   },
-  infoBtnText: {
-    color: '#fff',
-    fontWeight: '700',
-    marginLeft: 6,
-  },
+  infoBtnText: { color: '#fff', fontWeight: '700', marginLeft: 6 },
 
-  // FAB
   fab: {
     position: 'absolute',
     bottom: 120,
@@ -308,7 +259,6 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
 
-  // Botão "Painel de Moderador"
   modBtn: {
     position: 'absolute',
     bottom: 110,
@@ -324,9 +274,5 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
   },
-  modBtnText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 14,
-  },
+  modBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
 });
