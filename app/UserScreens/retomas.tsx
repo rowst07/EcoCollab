@@ -1,124 +1,208 @@
 import NovaRetomaModal from '@/components/modals/CriarRetomaModal';
 import { THEME } from '@/constants/Colors';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import { useState } from 'react';
+import { useRouter } from 'expo-router';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   FlatList,
+  RefreshControl,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
+  useColorScheme,
 } from 'react-native';
 
-const colors = THEME.dark;
+// Firestore (subs em tempo-real)
+import { auth } from '@/firebase';
+import {
+  subscribeMinhasRetomas,
+  subscribeRetomasDisponiveis,
+  type RetomaDoc,
+} from '@/services/FirestoreService';
 
-const retomasDisponiveis = [
-  {
-    id: '1',
-    nome: 'Garrafa PET usada',
-    tipo: 'Troca',
-    pontos: 10,
-    icon: 'bottle-soda-classic-outline',
-  },
-  {
-    id: '2',
-    nome: 'Tampas plásticas',
-    tipo: 'Doação',
-    pontos: 0,
-    icon: 'recycle',
-  },
-];
-
-const minhasRetomasIniciais = [
-  {
-    id: '3',
-    nome: 'Cartão velho',
-    tipo: 'Doação',
-    pontos: 0,
-    icon: 'credit-card-outline',
-  },
-];
+type Aba = 'disponiveis' | 'minhas';
 
 export default function Retomas() {
-  const [abaAtiva, setAbaAtiva] = useState<'disponiveis' | 'minhas'>('disponiveis');
-  const [minhasRetomas, setMinhasRetomas] = useState(minhasRetomasIniciais);
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'dark'; // força dark (ajusta se quiseres)
+  const colors = THEME[scheme];
+  const router = useRouter();
+
+  const [abaAtiva, setAbaAtiva] = useState<Aba>('disponiveis');
+  const [disponiveis, setDisponiveis] = useState<RetomaDoc[]>([]);
+  const [minhas, setMinhas] = useState<RetomaDoc[]>([]);
+  const [loadingDisp, setLoadingDisp] = useState(true);
+  const [loadingMinhas, setLoadingMinhas] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const lista = abaAtiva === 'disponiveis' ? retomasDisponiveis : minhasRetomas;
+  // subscrições
+  useEffect(() => {
+    const unsubDisp = subscribeRetomasDisponiveis({
+      onData: (list) => {
+        setDisponiveis(list);
+        setLoadingDisp(false);
+      },
+    });
 
-  const handleNovaRetoma = (nova) => {
-    setMinhasRetomas((prev) => [...prev, { ...nova, id: Date.now().toString(), icon: 'recycle' }]);
+    let unsubMine = () => {};
+    const uid = auth.currentUser?.uid;
+    if (uid) {
+      unsubMine = subscribeMinhasRetomas({
+        uid,
+        onData: (list) => {
+          setMinhas(list);
+          setLoadingMinhas(false);
+        },
+      });
+    } else {
+      setLoadingMinhas(false);
+    }
+
+    return () => {
+      unsubDisp();
+      unsubMine();
+    };
+  }, []);
+
+  const lista = useMemo(() => {
+    return abaAtiva === 'disponiveis' ? disponiveis : minhas;
+  }, [abaAtiva, disponiveis, minhas]);
+
+  const carregando = abaAtiva === 'disponiveis' ? loadingDisp : loadingMinhas;
+
+  const onRefresh = () => {
+    // como estamos com onSnapshot, o "refresh" é só feedback visual
+    setRefreshing(true);
+    setTimeout(() => setRefreshing(false), 700);
   };
 
-  return (
-    <View style={styles.wrapper}>
-      <Text style={styles.title}>Retomas</Text>
-
-      {/* Abas */}
-      <View style={styles.tabs}>
-        <TouchableOpacity
-          style={[styles.tab, abaAtiva === 'disponiveis' && styles.activeTab]}
-          onPress={() => setAbaAtiva('disponiveis')}
-        >
-          <Text style={[styles.tabText, abaAtiva === 'disponiveis' && styles.activeTabText]}>
-            Disponíveis
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, abaAtiva === 'minhas' && styles.activeTab]}
-          onPress={() => setAbaAtiva('minhas')}
-        >
-          <Text style={[styles.tabText, abaAtiva === 'minhas' && styles.activeTabText]}>
-            Minhas Retomas
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Lista */}
-      <FlatList
-        data={lista}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={{ paddingBottom: 100 }}
-        renderItem={({ item }) => (
-          <View style={styles.card}>
-            <MaterialCommunityIcons name={item.icon} size={32} color={colors.primary} style={styles.icon} />
-            <View style={styles.cardContent}>
-              <Text style={[styles.itemTitle, { color: colors.textOnCard }]}>{item.nome}</Text>
-              <Text style={[styles.itemType, { color: colors.textOnCard }]}>{`Tipo: ${item.tipo}`}</Text>
-              <Text style={styles.itemPoints}>+{item.pontos} pontos</Text>
-              <TouchableOpacity
-  style={styles.btn}
-  onPress={() =>
+  const abrirDetalhes = (item: RetomaDoc) => {
     router.push({
       pathname: '/UserScreens/detalhesRetoma',
       params: {
         id: item.id,
         nome: item.nome,
         tipo: item.tipo,
-        pontos: item.pontos,
-        icon: item.icon,
-        // opcionais:
-        descricao: 'Exemplo de descrição da retoma.',
-        quantidade: '1 unidade',
-        local: 'Centro, Bragança',
-        estado: 'Ativa',
-        autor: 'João Monteiro',
-        eMinha: abaAtiva === 'minhas', // se vier da aba "Minhas Retomas"
+        pontos: item.pontos ?? 0,
+        icon: item.icon ?? 'recycle',
+        descricao: item.descricao ?? '',
+        quantidade: item.quantidade ?? '—',
+        local: item.local ?? '—',
+        lat: item.lat ?? undefined,
+        lng: item.lng ?? undefined,
+        estado: item.estado,
+        autor: item.criadoPorDisplay ?? 'Utilizador',
+        condicao: item.condicao ?? 'Usado',
+        entrega: item.entrega ?? 'Levantamento',
+        preferencias: item.preferencias ?? '—',
+        tags: (item.tags ?? []).join(','),
+        createdAt: item.dataCriacao ? '' : '', // podes formatar quando leres diretamente do doc
+        validade: item.validade ?? undefined,
+        eMinha: auth.currentUser?.uid === item.criadoPor,
       },
-    })
-  }
->
-  <Text style={[styles.btnText, { color: colors.text }]}>Ver detalhes</Text>
-</TouchableOpacity>
-            </View>
-          </View>
-        )}
+    });
+  };
+
+  const renderItem = ({ item }: { item: RetomaDoc }) => (
+    <View style={[styles.card, { backgroundColor: colors.card }]}>
+      <MaterialCommunityIcons
+        name={(item.icon as any) || 'recycle'}
+        size={32}
+        color={colors.primary}
+        style={styles.icon}
       />
+      <View style={styles.cardContent}>
+        <Text style={[styles.itemTitle, { color: colors.textOnCard }]} numberOfLines={1}>
+          {item.nome}
+        </Text>
+        <Text style={[styles.itemType, { color: colors.textOnCard }]} numberOfLines={1}>
+          {`Tipo: ${item.tipo}`}
+        </Text>
+        <Text style={[styles.itemPoints, { color: colors.primary }]}>
+          +{item.pontos ?? 0} pontos
+        </Text>
+
+        <TouchableOpacity style={[styles.btn, { backgroundColor: colors.primary }]} onPress={() => abrirDetalhes(item)}>
+          <Text style={[styles.btnText, { color: colors.text }]}>Ver detalhes</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  const renderEmpty = () => {
+    if (carregando) return null;
+    return (
+      <View style={styles.emptyWrap}>
+        <Text style={[styles.emptyTitle, { color: colors.text }]}>
+          {abaAtiva === 'disponiveis' ? 'Sem retomas ativas' : 'Ainda não publicaste retomas'}
+        </Text>
+        {abaAtiva === 'minhas' && (
+          <TouchableOpacity style={[styles.floatingBtn, { position: 'relative', bottom: undefined }]} onPress={() => setModalVisible(true)}>
+            <MaterialCommunityIcons name="plus" size={24} color={colors.text} />
+            <Text style={styles.floatingBtnText}>Publicar retoma</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  };
+
+  return (
+    <View style={[styles.wrapper, { backgroundColor: colors.bgOther }]}>
+      <Text style={[styles.title, { color: colors.text }]}>Retomas</Text>
+
+      {/* Abas */}
+      <View style={styles.tabs}>
+        <TouchableOpacity
+          style={[styles.tab, { backgroundColor: colors.card }, abaAtiva === 'disponiveis' && { backgroundColor: colors.primary }]}
+          onPress={() => setAbaAtiva('disponiveis')}
+        >
+          <Text
+            style={[
+              styles.tabText,
+              { color: colors.textInput },
+              abaAtiva === 'disponiveis' && { color: colors.text, fontWeight: 'bold' },
+            ]}
+          >
+            Disponíveis
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, { backgroundColor: colors.card }, abaAtiva === 'minhas' && { backgroundColor: colors.primary }]}
+          onPress={() => setAbaAtiva('minhas')}
+        >
+          <Text
+            style={[
+              styles.tabText,
+              { color: colors.textInput },
+              abaAtiva === 'minhas' && { color: colors.text, fontWeight: 'bold' },
+            ]}
+          >
+            Minhas Retomas
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Lista */}
+      {carregando && lista.length === 0 ? (
+        <View style={{ flex: 1, alignItems: 'center' }}>
+          <ActivityIndicator style={{ marginTop: 30 }} color={colors.primary} />
+        </View>
+      ) : (
+        <FlatList
+          data={lista}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={{ paddingBottom: 120, paddingTop: 4 }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+          renderItem={renderItem}
+          ListEmptyComponent={renderEmpty}
+        />
+      )}
 
       {/* Botão de publicar retoma */}
       {abaAtiva === 'minhas' && (
-        <TouchableOpacity style={styles.floatingBtn} onPress={() => setModalVisible(true)}>
+        <TouchableOpacity style={[styles.floatingBtn, { backgroundColor: colors.primary }]} onPress={() => setModalVisible(true)}>
           <MaterialCommunityIcons name="plus" size={24} color={colors.text} />
           <Text style={styles.floatingBtnText}>Publicar retoma</Text>
         </TouchableOpacity>
@@ -128,7 +212,8 @@ export default function Retomas() {
       <NovaRetomaModal
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
-        onPublicar={handleNovaRetoma}
+        onPublicar={() => { /* não precisamos atualizar manualmente; onSnapshot trata disso */ }}
+        currentUserName={auth.currentUser?.displayName ?? undefined}
       />
     </View>
   );
@@ -137,7 +222,6 @@ export default function Retomas() {
 const styles = StyleSheet.create({
   wrapper: {
     flex: 1,
-    backgroundColor: colors.bg,
     paddingTop: 60,
     paddingHorizontal: 20,
   },
@@ -146,7 +230,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
     marginBottom: 20,
-    color: colors.text,
   },
   tabs: {
     flexDirection: 'row',
@@ -156,24 +239,14 @@ const styles = StyleSheet.create({
   tab: {
     paddingVertical: 10,
     paddingHorizontal: 20,
-    backgroundColor: colors.card,
     borderRadius: 20,
     marginHorizontal: 5,
   },
   tabText: {
     fontSize: 16,
-    color: colors.textInput,
-  },
-  activeTab: {
-    backgroundColor: colors.primary,
-  },
-  activeTabText: {
-    color: colors.text,
-    fontWeight: 'bold',
   },
   card: {
     flexDirection: 'row',
-    backgroundColor: colors.card,
     padding: 16,
     borderRadius: 12,
     marginBottom: 16,
@@ -197,11 +270,9 @@ const styles = StyleSheet.create({
   },
   itemPoints: {
     fontSize: 14,
-    color: colors.primary,
     marginBottom: 8,
   },
   btn: {
-    backgroundColor: colors.primary,
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 8,
@@ -214,7 +285,6 @@ const styles = StyleSheet.create({
   floatingBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.primary,
     padding: 12,
     borderRadius: 15,
     position: 'absolute',
@@ -222,11 +292,12 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     paddingHorizontal: 20,
     elevation: 5,
+    gap: 8,
   },
   floatingBtnText: {
-    color: colors.text,
     fontSize: 16,
     fontWeight: '600',
-    marginLeft: 8,
   },
+  emptyWrap: { alignItems: 'center', marginTop: 24, gap: 10 },
+  emptyTitle: { fontSize: 16, fontWeight: '600' },
 });

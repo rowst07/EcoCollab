@@ -6,6 +6,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import MapView, { Callout, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 
 // 🔥 serviço Firestore (novas funções abaixo)
+import { MAP_STYLE_DARK } from '@/constants/Map';
 import { subscribePontosRecolha, type PontoMarker } from '@/services/FirestoreService';
 
 const cores: Record<string, string> = {
@@ -15,7 +16,7 @@ const cores: Record<string, string> = {
   pilhas: '#F44336',
   organico: '#795548',
   metal: '#9E9E9E',
-  outros: '#9C27B0'
+  outros: '#9C27B0',
 };
 
 export default function HomeUser() {
@@ -32,7 +33,7 @@ export default function HomeUser() {
     metal: true,
     pilhas: true,
     organico: true,
-    classificacao: 'todos'
+    classificacao: 'todos',
   });
 
   useEffect(() => {
@@ -51,17 +52,21 @@ export default function HomeUser() {
   };
 
   const filtrados = useMemo(() => {
-    return ecopontos.filter(e => {
+    return ecopontos.filter((e) => {
       const nomeOk = e.nome.toLowerCase().includes(pesquisa.toLowerCase());
       const tipos = e.tipos?.length ? e.tipos : ['outros'];
       const algumTipoAtivo = tipos.some((t: string) => (filtros as any)[t] === true);
-      const classOk = filtros.classificacao === 'todos' || (e.classificacao ?? 0) >= Number(filtros.classificacao);
+      const classOk =
+        filtros.classificacao === 'todos' || (e.classificacao ?? 0) >= Number(filtros.classificacao);
       return nomeOk && algumTipoAtivo && classOk;
     });
   }, [ecopontos, pesquisa, filtros]);
 
   const abrirDetalhes = (eco: PontoMarker) => {
-    router.push(`/UserScreens/detalhesEcoponto?id=${eco.id}`);
+    router.push({
+      pathname: '/UserScreens/detalhesEcoponto',
+      params: { id: eco.id },
+    });
   };
 
   const renderCirculosTipos = (eco: PontoMarker) => {
@@ -69,7 +74,10 @@ export default function HomeUser() {
     return (
       <View style={styles.circulosRow}>
         {tipos.map((t, idx) => (
-          <View key={idx} style={[styles.circulo, { backgroundColor: cores[t] || cores.outros }]} />
+          <View
+            key={idx}
+            style={[styles.circulo, { backgroundColor: cores[t] || cores.outros }]}
+          />
         ))}
       </View>
     );
@@ -80,7 +88,7 @@ export default function HomeUser() {
     const arr = [1, 2, 3, 4, 5];
     return (
       <View style={styles.estrelasRow}>
-        {arr.map(i => (
+        {arr.map((i) => (
           <Ionicons
             key={i}
             name={i <= score ? 'star' : 'star-outline'}
@@ -104,7 +112,7 @@ export default function HomeUser() {
         </TouchableOpacity>
       </View>
 
-      {/* Mapa */}
+      {/* Mapa (tema escuro) */}
       <MapView
         provider={PROVIDER_GOOGLE}
         style={{ flex: 1 }}
@@ -112,36 +120,42 @@ export default function HomeUser() {
           latitude: 41.805,
           longitude: -6.756,
           latitudeDelta: 0.02,
-          longitudeDelta: 0.02
+          longitudeDelta: 0.02,
         }}
+        customMapStyle={MAP_STYLE_DARK}
         loadingEnabled
         onMapReady={() => console.log('[Map] ready')}
         onMapLoaded={() => console.log('[Map] loaded')}
       >
-        {filtrados.map(e => (
+        {filtrados.map((e) => (
           <Marker
             key={e.id}
             coordinate={{ latitude: e.latitude, longitude: e.longitude }}
-            onCalloutPress={() => abrirDetalhes(e)}
           >
-            <Callout tooltip>
+            <Callout
+              tooltip
+              onPress={() => abrirDetalhes(e)}       // iOS/Android fiável
+            >
               <View style={styles.calloutCard}>
                 <Text style={styles.calloutTitle}>{e.nome}</Text>
 
                 {/* Resíduos (círculos coloridos) */}
                 {renderCirculosTipos(e)}
 
-                {/* Classificação (se não tiver, mostra 0) */}
+                {/* Classificação */}
                 <View style={styles.classRow}>
                   {renderEstrelas(e.classificacao)}
                   <Text style={styles.classText}>{(e.classificacao ?? 0).toFixed(1)}</Text>
                 </View>
 
-                {/* “Botão” visual (sem onPress) */}
-                <View style={styles.infoBtn}>
+                {/* Botão visual */}
+                <TouchableOpacity
+                  style={styles.infoBtn}
+                  onPress={() => abrirDetalhes(e)}   // reforço do onPress no conteúdo do callout
+                >
                   <Ionicons name="information-circle" size={18} color="#fff" />
                   <Text style={styles.infoBtnText}>Detalhes</Text>
-                </View>
+                </TouchableOpacity>
               </View>
             </Callout>
           </Marker>
@@ -189,53 +203,53 @@ const styles = StyleSheet.create({
     left: 5,
     right: 5,
     paddingHorizontal: 10,
-    zIndex: 1
+    zIndex: 1,
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: '#1f1f1f',
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#ccc',
+    borderColor: '#3a3a3a',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.2,
     shadowRadius: 2,
-    elevation: 2
+    elevation: 2,
   },
   searchPlaceholder: {
     marginLeft: 8,
-    color: '#888',
-    fontSize: 16
+    color: '#bdbdbd',
+    fontSize: 16,
   },
 
   // Callout
   calloutCard: {
     minWidth: 230,
     maxWidth: 260,
-    backgroundColor: '#fff',
+    backgroundColor: '#2a2a2a',
     borderRadius: 12,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#e5e5e5',
+    borderColor: '#3a3a3a',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 2,
-    elevation: 2
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 2,
   },
   calloutTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#111',
-    marginBottom: 6
+    color: '#f2f2f2',
+    marginBottom: 6,
   },
   circulosRow: {
     flexDirection: 'row',
-    marginBottom: 6
+    marginBottom: 6,
   },
   circulo: {
     width: 16,
@@ -243,20 +257,20 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginRight: 6,
     borderWidth: 1,
-    borderColor: '#00000020'
+    borderColor: '#00000040',
   },
   classRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10
+    marginBottom: 10,
   },
   estrelasRow: {
     flexDirection: 'row',
-    marginRight: 6
+    marginRight: 6,
   },
   classText: {
-    color: '#555',
-    fontWeight: '600'
+    color: '#d0d0d0',
+    fontWeight: '600',
   },
   infoBtn: {
     backgroundColor: '#2E7D32',
@@ -267,12 +281,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     alignSelf: 'center',
-    marginTop: 8
+    marginTop: 8,
   },
   infoBtnText: {
     color: '#fff',
     fontWeight: '700',
-    marginLeft: 6
+    marginLeft: 6,
   },
 
   // FAB
@@ -291,7 +305,7 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
-    shadowRadius: 4
+    shadowRadius: 4,
   },
 
   // Botão "Painel de Moderador"
@@ -308,11 +322,11 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
-    shadowRadius: 4
+    shadowRadius: 4,
   },
   modBtnText: {
     color: '#fff',
     fontWeight: '700',
-    fontSize: 14
-  }
+    fontSize: 14,
+  },
 });

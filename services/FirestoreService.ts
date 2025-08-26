@@ -379,3 +379,117 @@ export function subscribeUserStats(uid: string, cb: (stats: UserStats) => void):
     unsubReportes();
   };
 }
+
+// ===================== RETOMAS =====================
+
+export type RetomaEstado = 'Ativa' | 'Reservada' | 'Concluída';
+
+export type RetomaCreate = {
+  nome: string;
+  tipo: 'Doação' | 'Troca' | string;
+  pontos: number;
+  icon?: string;
+  descricao?: string;
+  fotoUrl?: string | null;
+  quantidade?: string;
+  condicao?: 'Novo' | 'Como novo' | 'Usado' | 'Para reciclar' | string;
+  entrega?: 'Levantamento' | 'Entrega a combinar' | 'Envio' | string;
+  local?: string;
+  lat?: number | null;
+  lng?: number | null;
+  preferencias?: string;
+  tags?: string[];
+  validade?: string | null;
+  estado: RetomaEstado;
+  criadoPor: string;               // uid
+  criadoPorDisplay?: string | null;
+  contacto?: string | null;
+};
+
+export type RetomaDoc = RetomaCreate & {
+  id: string;
+  dataCriacao?: any;
+  dataAtualizacao?: any;
+};
+
+const retomasCol = collection(db, 'retomas');
+
+/** Remove chaves com undefined (Firestore não aceita undefined) */
+function pruneUndefined<T extends Record<string, any>>(obj: T): T {
+  const copy: any = {};
+  Object.keys(obj).forEach((k) => {
+    const v = (obj as any)[k];
+    if (v !== undefined) copy[k] = v;
+  });
+  return copy;
+}
+
+/** Create */
+export async function addRetoma(data: RetomaCreate): Promise<string> {
+  const cleaned = pruneUndefined({
+    ...data,
+    // normalizações finais
+    fotoUrl: data.fotoUrl ?? null,
+    lat: data.lat ?? null,
+    lng: data.lng ?? null,
+    validade: data.validade ?? null,
+    contacto: data.contacto ?? null,
+    dataCriacao: serverTimestamp(),
+    dataAtualizacao: serverTimestamp(),
+  });
+  const ref = await addDoc(retomasCol, cleaned);
+  return ref.id;
+}
+
+/** Update (owner ou mod/admin pelas rules) */
+export async function updateRetomaDoc(id: string, patch: Partial<RetomaCreate>) {
+  const cleaned = pruneUndefined({
+    ...patch,
+    dataAtualizacao: serverTimestamp(),
+  });
+  const dref = doc(retomasCol, id);
+  await updateDoc(dref, cleaned);
+}
+
+export function subscribeRetomasDisponiveis(args: {
+  onData: (list: RetomaDoc[]) => void;
+}): Unsubscribe {
+  let qy = query(retomasCol, where('estado', '==', 'Ativa'), orderBy('dataCriacao', 'desc'));
+  return onSnapshot(qy, (snap) => {
+    const list: RetomaDoc[] = [];
+    snap.forEach((docSnap) => {
+      const d = { id: docSnap.id, ...(docSnap.data() as any) } as RetomaDoc;
+      list.push(d);
+    });
+    args.onData(list);
+  });
+}
+
+/** Subscrição: minhas retomas por UID, ordenadas por dataCriacao desc */
+export function subscribeMinhasRetomas(args: {
+  uid: string;
+  onData: (list: RetomaDoc[]) => void;
+}): Unsubscribe {
+  let qy = query(retomasCol, where('criadoPor', '==', args.uid), orderBy('dataCriacao', 'desc'));
+  return onSnapshot(qy, (snap) => {
+    const list: RetomaDoc[] = [];
+    snap.forEach((docSnap) => {
+      const d = { id: docSnap.id, ...(docSnap.data() as any) } as RetomaDoc;
+      list.push(d);
+    });
+    args.onData(list);
+  });
+}
+
+/** Subscreve em tempo-real uma retoma por ID */
+export function subscribeRetomaById(
+  id: string,
+  cb: (d: RetomaDoc | null) => void
+): Unsubscribe {
+  const dref = doc(retomasCol, id);
+  return onSnapshot(dref, (snap) => {
+    if (!snap.exists()) return cb(null);
+    const raw = { id: snap.id, ...(snap.data() as any) } as RetomaDoc;
+    cb(raw);
+  });
+}

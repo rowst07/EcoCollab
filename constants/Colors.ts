@@ -42,6 +42,7 @@ export const THEME = {
   },
   dark: {
     bg:        '#000000',
+    bgOther:   '#111111ff',
     card:      '#EEEDD7',
     overlay:   '#00000099',
     border:    '#18181B',

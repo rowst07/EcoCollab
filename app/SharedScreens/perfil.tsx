@@ -42,7 +42,7 @@ export default function Perfil() {
   const totalRetomas = stats.pontosCriados + stats.reportes;
 
   return (
-    <View style={[styles.wrapper, { backgroundColor: T.bg }]}>
+    <View style={[styles.wrapper, { backgroundColor: THEME.dark.bgOther }]}>
       {/* Header com título e ícones */}
       <View style={styles.header}>
         <Text style={[styles.title, { color: T.text }]}>Perfil</Text>
