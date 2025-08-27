@@ -2,16 +2,20 @@
 import { useUserDoc } from '@/hooks/useUserDoc';
 import { useAuth } from '@/services/AuthContext';
 import {
-  subscribeMinhasRetomas,
+  subscribeMinhasRetomas, // retomas favoritas
+  subscribePontosFavoritos,
+  subscribeUserFavorites,
   subscribeUserStats,
+  type PontoRecolhaDoc, // pontos favoritos
   type RetomaDoc,
   type UserStats,
 } from '@/services/FirestoreService';
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   Image,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -28,20 +32,20 @@ export default function Perfil() {
   const { userDoc, loading } = useUserDoc();
   const { user } = useAuth();
 
-  // Labels de role (corrigido: 'moderator' em vez de 'mod')
   const ROLE_LABELS: Record<string, string> = {
     user: 'Utilizador',
     moderator: 'Moderador',
     admin: 'Administrador',
   };
 
-  // stats em tempo-real: pontos criados + reportes submetidos
   const [stats, setStats] = useState<UserStats>({ pontosCriados: 0, reportes: 0 });
-
-  // contagem de retomas do utilizador
   const [myRetomasCount, setMyRetomasCount] = useState<number>(0);
 
-  // tab local: histórico | favoritos
+  // favoritos
+  const [favRetomas, setFavRetomas] = useState<RetomaDoc[]>([]);
+  const [favPontos, setFavPontos] = useState<PontoRecolhaDoc[]>([]);
+
+  // tab local
   const [activeTab, setActiveTab] = useState<'historico' | 'favoritos'>('historico');
 
   useEffect(() => {
@@ -56,6 +60,20 @@ export default function Perfil() {
       uid: user.uid,
       onData: (list: RetomaDoc[]) => setMyRetomasCount(list.length),
     });
+    return () => unsub();
+  }, [user?.uid]);
+
+  // subscrever retomas favoritas
+  useEffect(() => {
+    if (!user?.uid) return;
+    const unsub = subscribeUserFavorites(user.uid, setFavRetomas);
+    return () => unsub();
+  }, [user?.uid]);
+
+  // subscrever pontos de recolha favoritos
+  useEffect(() => {
+    if (!user?.uid) return;
+    const unsub = subscribePontosFavoritos(user.uid, setFavPontos);
     return () => unsub();
   }, [user?.uid]);
 
@@ -119,32 +137,24 @@ export default function Perfil() {
           </Text>
         </View>
 
-        {/* Substituído: "1240 Pontos" -> nº total de retomas do utilizador */}
+        {/* nº total de retomas do utilizador */}
         <View style={[styles.statBox, { backgroundColor: T.card, borderColor: T.border }]}>
           <Text style={[styles.statNumber, { color: BRAND.primary }]}>
             {loading ? '—' : myRetomasCount}
           </Text>
           <Text style={[styles.statLabel, { color: T.textInput }]}>Retomas</Text>
-          <Text style={{ color: T.textMuted, marginTop: 4, fontSize: 12 }}>
-            Criadas
-          </Text>
+          <Text style={{ color: T.textMuted, marginTop: 4, fontSize: 12 }}>Criadas</Text>
         </View>
       </View>
 
       {/* Tabs: Histórico / Favoritos */}
       <View style={[styles.tabs, { backgroundColor: T.card, borderColor: T.border }]}>
         <TouchableOpacity
-          style={[
-            styles.tabBtn,
-            activeTab === 'historico' && { backgroundColor: T.border },
-          ]}
+          style={[styles.tabBtn, activeTab === 'historico' && { backgroundColor: T.border }]}
           onPress={() => setActiveTab('historico')}
         >
           <Text
-            style={[
-              styles.tabText,
-              { color: activeTab === 'historico' ? T.text : T.textMuted },
-            ]}
+            style={[styles.tabText, { color: activeTab === 'historico' ? T.text : T.textMuted }]}
           >
             Histórico
           </Text>
@@ -154,10 +164,7 @@ export default function Perfil() {
           onPress={() => setActiveTab('favoritos')}
         >
           <Text
-            style={[
-              styles.tabText,
-              { color: activeTab === 'favoritos' ? T.text : T.textMuted },
-            ]}
+            style={[styles.tabText, { color: activeTab === 'favoritos' ? T.text : T.textMuted }]}
           >
             Favoritos
           </Text>
@@ -186,18 +193,82 @@ export default function Perfil() {
           </TouchableOpacity>
         </View>
       ) : (
-        <View style={styles.favSection}>
-          <Text style={[styles.favInfo, { color: T.textMuted }]}>
-            Guarda aqui retomas ou ecopontos para acesso rápido.
-          </Text>
-          <TouchableOpacity
-            style={[styles.favBtn, { backgroundColor: BRAND.primary }]}
-            onPress={() => router.push('/UserScreens/favoritos')}
-          >
-            <Feather name="star" size={18} color="#fff" />
-            <Text style={styles.favBtnText}>Ver Favoritos</Text>
-          </TouchableOpacity>
-        </View>
+        // ====== FAVORITOS ======
+        <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
+          {/* Retomas Favoritas */}
+          <View style={{ marginTop: 6 }}>
+            <Text style={[styles.groupTitle, { color: T.text }]}>Retomas favoritas</Text>
+            {favRetomas.length === 0 ? (
+              <Text style={[styles.emptyText, { color: T.textMuted }]}>
+                Ainda não tens retomas favoritas.
+              </Text>
+            ) : (
+              favRetomas.map((r) => (
+                <TouchableOpacity
+                  key={r.id}
+                  onPress={() => router.push(`/UserScreens/detalhesRetoma?id=${r.id}`)}
+                  style={[styles.cardRow, { backgroundColor: T.card, borderColor: T.border }]}
+                  activeOpacity={0.85}
+                >
+                  <View style={styles.cardRowLeft}>
+                    <View style={styles.thumb}>
+                      {r.fotoUrl ? (
+                        <Image source={{ uri: r.fotoUrl }} style={styles.thumbImg} />
+                      ) : (
+                        <Ionicons name="gift-outline" size={20} color="#999" />
+                      )}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text numberOfLines={1} style={[styles.cardTitle, { color: T.textInput }]}>
+                        {r.nome}
+                      </Text>
+                      <Text style={[styles.cardSub, { color: T.textMuted }]}>{r.tipo}</Text>
+                    </View>
+                  </View>
+                  <Feather name="chevron-right" size={18} color={T.icon} />
+                </TouchableOpacity>
+              ))
+            )}
+          </View>
+
+          {/* Pontos de Recolha Favoritos */}
+          <View style={{ marginTop: 16 }}>
+            <Text style={[styles.groupTitle, { color: T.text }]}>Pontos de recolha favoritos</Text>
+            {favPontos.length === 0 ? (
+              <Text style={[styles.emptyText, { color: T.textMuted }]}>
+                Ainda não tens ecopontos favoritos.
+              </Text>
+            ) : (
+              favPontos.map((p) => (
+                <TouchableOpacity
+                  key={p.id}
+                  onPress={() => router.push(`/UserScreens/detalhesEcoponto?id=${p.id}`)}
+                  style={[styles.cardRow, { backgroundColor: T.card, borderColor: T.border }]}
+                  activeOpacity={0.85}
+                >
+                  <View style={styles.cardRowLeft}>
+                    <View style={styles.thumb}>
+                      {p.fotoUrl ? (
+                        <Image source={{ uri: p.fotoUrl }} style={styles.thumbImg} />
+                      ) : (
+                        <Ionicons name="leaf-outline" size={20} color="#999" />
+                      )}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text numberOfLines={1} style={[styles.cardTitle, { color: T.textInput }]}>
+                        {p.nome}
+                      </Text>
+                      <Text numberOfLines={1} style={[styles.cardSub, { color: T.textMuted }]}>
+                        {p.endereco ?? '—'}
+                      </Text>
+                    </View>
+                  </View>
+                  <Feather name="chevron-right" size={18} color={T.icon} />
+                </TouchableOpacity>
+              ))
+            )}
+          </View>
+        </ScrollView>
       )}
     </View>
   );
@@ -310,26 +381,53 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 
-  favSection: {
-    marginTop: 6,
-    alignItems: 'center',
+  // Favoritos
+  groupTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 8,
   },
-  favInfo: {
+  emptyText: {
     fontSize: 14,
-    marginBottom: 12,
     textAlign: 'center',
+    opacity: 0.8,
   },
-  favBtn: {
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+
+  cardRow: {
     borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
   },
-  favBtnText: {
-    color: '#fff',
+  cardRowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+    paddingRight: 6,
+  },
+  cardTitle: {
     fontSize: 16,
     fontWeight: '700',
+  },
+  cardSub: {
+    fontSize: 12,
+  },
+  thumb: {
+    width: 42,
+    height: 42,
+    borderRadius: 10,
+    backgroundColor: '#111',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  thumbImg: {
+    width: '100%',
+    height: '100%',
   },
 });

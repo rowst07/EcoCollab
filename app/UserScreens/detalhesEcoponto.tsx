@@ -1,11 +1,13 @@
 // app/UserScreens/detalhesEcoponto.tsx
 import { BRAND, RESIDUE_COLORS } from '@/constants/Colors';
 import { useTheme, useThemeColor } from '@/hooks/useThemeColor';
+import { useUserDoc } from '@/hooks/useUserDoc';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Dimensions,
   Image,
   Linking,
@@ -18,12 +20,17 @@ import {
 } from 'react-native';
 
 // 🔥 Firestore
-import { subscribePontoRecolhaById, type PontoMarker } from '@/services/FirestoreService';
+import { auth } from '@/firebase';
+import {
+  subscribePontoRecolhaById,
+  updatePontoFavorito, // <— nova função no service
+  type PontoMarker
+} from '@/services/FirestoreService';
 
 export default function DetalhesEcoponto() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
-  const pontoId = Array.isArray(id) ? id[0] : id; // id vem como string
+  const pontoId = Array.isArray(id) ? id[0] : id;
 
   // Tema
   const t = useTheme();
@@ -33,8 +40,18 @@ export default function DetalhesEcoponto() {
   const card = useThemeColor('card');
   const bg = useThemeColor('bg');
 
+  // Role do user (para mostrar botão Editar)
+  const { userDoc } = useUserDoc();
+  const isModOrAdmin = useMemo(
+    () => ['moderator', 'admin'].includes((userDoc?.role as any) || ''),
+    [userDoc?.role]
+  );
+
+  const uid = auth.currentUser?.uid;
+
   const [eco, setEco] = useState<PontoMarker | null>(null);
   const [loading, setLoading] = useState(true);
+  const [favLoading, setFavLoading] = useState(false);
 
   // subscrição em tempo real ao documento
   useEffect(() => {
@@ -46,8 +63,14 @@ export default function DetalhesEcoponto() {
     return () => unsub();
   }, [pontoId]);
 
+  const isFavorite = useMemo(() => {
+    if (!uid) return false;
+    const arr = (eco as any)?.favoritos ?? [];
+    return Array.isArray(arr) && arr.includes(uid);
+  }, [eco, uid]);
+
   const width = Dimensions.get('window').width;
-  const height = Math.round(width * 9 / 16);
+  const height = Math.round((width * 9) / 16);
 
   const abrirNavegacao = () => {
     if (!eco?.latitude || !eco.longitude) return;
@@ -74,6 +97,28 @@ export default function DetalhesEcoponto() {
         ))}
       </View>
     );
+  };
+
+  const toggleFavorito = async () => {
+    if (!uid) {
+      Alert.alert('Sessão necessária', 'Inicie sessão para adicionar aos favoritos.');
+      return;
+    }
+    if (!pontoId) return;
+
+    try {
+      setFavLoading(true);
+      await updatePontoFavorito(pontoId, uid, !isFavorite);
+    } catch (e: any) {
+      Alert.alert('Erro', e?.message ?? 'Não foi possível atualizar favoritos.');
+    } finally {
+      setFavLoading(false);
+    }
+  };
+
+  const editarPonto = () => {
+    if (!isModOrAdmin || !pontoId) return;
+    router.push({ pathname: '/ModScreens/editarEcoponto', params: { id: pontoId } });
   };
 
   if (loading) {
@@ -118,13 +163,33 @@ export default function DetalhesEcoponto() {
 
   return (
     <View style={{ flex: 1, backgroundColor: bg }}>
-      {/* Header (mantemos preto para consistência visual do app) */}
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={28} color="#fff" />
         </TouchableOpacity>
+
         <Text style={styles.headerTitle}>Detalhes do Ecoponto</Text>
-        <View style={{ width: 28 }} />
+
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          {/* Editar (mods/admins) */}
+          {isModOrAdmin ? (
+            <TouchableOpacity onPress={editarPonto}>
+              <Ionicons name="create-outline" size={22} color="#fff" />
+            </TouchableOpacity>
+          ) : (
+            <View style={{ width: 22 }} />
+          )}
+
+          {/* Favorito */}
+          <TouchableOpacity onPress={toggleFavorito} disabled={favLoading}>
+            <Ionicons
+              name={isFavorite ? 'heart' : 'heart-outline'}
+              size={24}
+              color={isFavorite ? '#ef4444' : '#fff'}
+            />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>

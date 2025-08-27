@@ -327,7 +327,7 @@ export default function NovaRetomaModal({
               />
 
               {/* --- Contacto --- */}
-              <Text style={[styles.label, { color: THEME[scheme].text ?? '#333' }]}>Contacto (opcional)</Text>
+              <Text style={[styles.label, { color: THEME[scheme].text ?? '#333' }]}>Contacto</Text>
               <TextInput
                 style={[styles.input, inputBase]}
                 placeholder="Email ou telemóvel p/ combinar"

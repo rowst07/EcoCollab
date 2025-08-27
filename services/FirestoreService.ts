@@ -173,6 +173,7 @@ export type PontoRecolhaCreate = {
   criadoPor: string;
   criadoPorDisplay?: string | null;
   status: PontoRecolhaStatus; // "pendente" na criação
+  favoritos?: string[];       // UIDs que marcaram favorito
 };
 
 export type PontoRecolhaDoc = PontoRecolhaCreate & {
@@ -187,6 +188,7 @@ const pontoRecolhaCol = collection(db, 'pontoRecolha');
 export async function addPontoRecolha(data: PontoRecolhaCreate): Promise<string> {
   const docRef = await addDoc(pontoRecolhaCol, {
     ...data,
+    favoritos: Array.isArray(data.favoritos) ? data.favoritos : [],
     dataCriacao: serverTimestamp(),
     dataAtualizacao: serverTimestamp(),
   });
@@ -201,12 +203,25 @@ export function pontoRecolhaDocRef(id: string) {
 /** 🔹 UPDATE parcial de ponto  */
 export async function updatePontoRecolha(
   id: string,
-  data: Partial<PontoRecolhaCreate> & { status?: PontoRecolhaStatus }
+  data: Partial<PontoRecolhaCreate> & { status?: PontoRecolhaStatus } & {
+    // opcionalmente aceitar localizacao como objeto com lat/lng
+    localizacao?: GeoPoint | { latitude: number; longitude: number };
+  }
 ) {
-  await updateDoc(pontoRecolhaDocRef(id), {
-    ...data,
-    dataAtualizacao: serverTimestamp(),
-  });
+  let patch: any = { ...data, dataAtualizacao: serverTimestamp() };
+
+  // aceitar localizacao como { latitude, longitude } e converter para GeoPoint
+  if (data.localizacao && !(data.localizacao instanceof GeoPoint)) {
+    const loc = data.localizacao as any;
+    if (
+      typeof loc?.latitude === 'number' &&
+      typeof loc?.longitude === 'number'
+    ) {
+      patch.localizacao = new GeoPoint(loc.latitude, loc.longitude);
+    }
+  }
+
+  await updateDoc(pontoRecolhaDocRef(id), patch);
 }
 
 /** 🔹 DELETE ponto */
@@ -226,6 +241,7 @@ export type PontoMarker = {
   descricao?: string;
   fotoUrl?: string | null;
   status: PontoRecolhaStatus;
+  favoritos?: string[];    // <<— exposto também no marker
 };
 
 /** Converte documento Firestore -> shape para o mapa */
@@ -242,6 +258,7 @@ export function mapPontoToMarker(d: PontoRecolhaDoc): PontoMarker | null {
     descricao: d.descricao,
     fotoUrl: d.fotoUrl ?? null,
     status: d.status,
+    favoritos: d.favoritos ?? [],
   };
 }
 
@@ -278,7 +295,7 @@ export async function getPontoRecolhaById(id: string): Promise<PontoMarker | nul
   return mapPontoToMarker(raw);
 }
 
-/** Subscreve em tempo-real a um ponto por ID (detalhes) */
+/** Subscreve em tempo-real a um ponto por ID (detalhes) -> shape marker */
 export function subscribePontoRecolhaById(
   id: string,
   cb: (ponto: PontoMarker | null) => void
@@ -290,6 +307,49 @@ export function subscribePontoRecolhaById(
     cb(mapPontoToMarker(raw));
   });
 }
+
+/** 🔹 Lê uma única vez o DOC COMPLETO do ponto (não mapeado) */
+export async function getPontoRecolhaFullById(id: string): Promise<PontoRecolhaDoc | null> {
+  const dref = doc(pontoRecolhaCol, id);
+  const snap = await getDoc(dref);
+  if (!snap.exists()) return null;
+  return { id: snap.id, ...(snap.data() as any) } as PontoRecolhaDoc;
+}
+
+/** 🔹 Subscrição ao DOC COMPLETO do ponto (não mapeado) */
+export function subscribePontoRecolhaFullById(
+  id: string,
+  cb: (doc: PontoRecolhaDoc | null) => void
+): Unsubscribe {
+  const dref = doc(pontoRecolhaCol, id);
+  return onSnapshot(dref, (snap) => {
+    if (!snap.exists()) return cb(null);
+    cb({ id: snap.id, ...(snap.data() as any) } as PontoRecolhaDoc);
+  });
+}
+
+/** 🔹 Favoritos: adiciona/remove o uid do array `favoritos` de um ponto */
+export async function updatePontoFavorito(id: string, uid: string, fav: boolean) {
+  const dref = doc(pontoRecolhaCol, id);
+  await updateDoc(dref, {
+    favoritos: fav ? arrayUnion(uid) : arrayRemove(uid),
+    dataAtualizacao: serverTimestamp(),
+  });
+}
+
+/** 🔹 Lista em tempo real de pontos favoritos de um utilizador */
+export function subscribePontosFavoritos(
+  uid: string,
+  onData: (list: PontoRecolhaDoc[]) => void
+): Unsubscribe {
+  const qy = query(pontoRecolhaCol, where('favoritos', 'array-contains', uid), orderBy('dataCriacao', 'desc'));
+  return onSnapshot(qy, (snap) => {
+    const list: PontoRecolhaDoc[] = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) } as PontoRecolhaDoc));
+    onData(list);
+  });
+}
+
+
 
 // ===================== REPORTES =====================
 
@@ -374,6 +434,7 @@ export async function updateReporteStatus(id: string, status: ReporteStatus) {
 }
 
 
+
 // ===================== STATS POR UTILIZADOR =====================
 
 export type UserStats = {
@@ -415,6 +476,8 @@ export function subscribeUserStats(uid: string, cb: (stats: UserStats) => void):
     unsubReportes();
   };
 }
+
+
 
 // ===================== RETOMAS =====================
 
