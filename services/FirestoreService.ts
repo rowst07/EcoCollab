@@ -2,6 +2,8 @@
 import { User } from 'firebase/auth';
 import {
   addDoc,
+  arrayRemove,
+  arrayUnion,
   collection,
   deleteDoc,
   doc,
@@ -438,6 +440,9 @@ export type RetomaCreate = {
   criadoPor: string;               // uid
   criadoPorDisplay?: string | null;
   contacto?: string | null;
+
+  /** UIDs dos utilizadores que marcaram esta retoma como favorita */
+  favoritos?: string[];
 };
 
 export type RetomaDoc = RetomaCreate & {
@@ -467,6 +472,7 @@ export async function addRetoma(data: RetomaCreate): Promise<string> {
     lng: data.lng ?? null,
     validade: data.validade ?? null,
     contacto: data.contacto ?? null,
+    favoritos: Array.isArray(data.favoritos) ? data.favoritos : [], // inicializa favoritos
     dataCriacao: serverTimestamp(),
     dataAtualizacao: serverTimestamp(),
   });
@@ -535,6 +541,24 @@ export async function updateRetomaPartial(id: string, data: Partial<RetomaDoc>) 
     dataAtualizacao: serverTimestamp(),
   };
   await updateDoc(dref, patch as any);
+}
+
+/** 🔹 Favoritos: adiciona/remove o uid do array `favoritos` de uma retoma */
+export async function updateRetomaFavorite(id: string, uid: string, fav: boolean) {
+  const dref = doc(retomasCol, id);
+  await updateDoc(dref, {
+    favoritos: fav ? arrayUnion(uid) : arrayRemove(uid),
+    dataAtualizacao: serverTimestamp(),
+  });
+}
+
+/** 🔹 Lista em tempo real de retomas favoritas de um utilizador */
+export function subscribeUserFavorites(uid: string, onData: (list: RetomaDoc[]) => void): Unsubscribe {
+  const qy = query(retomasCol, where('favoritos', 'array-contains', uid), orderBy('dataCriacao', 'desc'));
+  return onSnapshot(qy, (snap) => {
+    const list: RetomaDoc[] = snap.docs.map((d) => ({ id: d.id, ...(d.data() as any) } as RetomaDoc));
+    onData(list);
+  });
 }
 
 // utilitário simples para saber o role atual do utilizador

@@ -20,6 +20,7 @@ import { auth } from '@/firebase';
 import {
   getUserMinimalDoc,
   subscribeRetomaById,
+  updateRetomaFavorite,
   type RetomaDoc,
 } from '@/services/FirestoreService';
 
@@ -50,6 +51,15 @@ export default function DetalhesRetoma() {
     [uid, retoma?.criadoPor]
   );
 
+  // favorito (derivado do doc)
+  const isFavorite = useMemo(() => {
+    if (!uid) return false;
+    const arr = retoma?.favoritos ?? [];
+    return Array.isArray(arr) && arr.includes(uid);
+  }, [retoma?.favoritos, uid]);
+
+  const [favLoading, setFavLoading] = useState(false);
+
   useEffect(() => {
     if (!id) {
       setLoading(false);
@@ -68,6 +78,23 @@ export default function DetalhesRetoma() {
     });
     return () => unsub();
   }, [id]);
+
+  const toggleFavorite = async () => {
+    if (!uid) {
+      Alert.alert('Sessão necessária', 'Inicie sessão para adicionar aos favoritos.');
+      return;
+    }
+    if (!id) return;
+
+    try {
+      setFavLoading(true);
+      await updateRetomaFavorite(id, uid, !isFavorite);
+    } catch (e: any) {
+      Alert.alert('Erro', e?.message ?? 'Não foi possível atualizar favoritos.');
+    } finally {
+      setFavLoading(false);
+    }
+  };
 
   // Galeria completa
   const gallery = useMemo(() => {
@@ -133,10 +160,26 @@ export default function DetalhesRetoma() {
         <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={22} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>Detalhes</Text>
-        <TouchableOpacity style={styles.iconBtn} onPress={editar}>
-          <Ionicons name="create-outline" size={20} color={colors.text} />
-        </TouchableOpacity>
+
+        <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
+          Detalhes
+        </Text>
+
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          {/* Coração de favoritos */}
+          <TouchableOpacity style={styles.iconBtn} onPress={toggleFavorite} disabled={favLoading}>
+            <Ionicons
+              name={isFavorite ? 'heart' : 'heart-outline'}
+              size={22}
+              color={isFavorite ? '#ef4444' : colors.text}
+            />
+          </TouchableOpacity>
+
+          {/* Editar */}
+          <TouchableOpacity style={styles.iconBtn} onPress={editar}>
+            <Ionicons name="create-outline" size={20} color={colors.text} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
@@ -173,11 +216,9 @@ export default function DetalhesRetoma() {
                     styles.statusDot,
                     {
                       backgroundColor:
-                        retoma.estado === 'Concluída'
-                          ? '#8E8E93'
-                          : retoma.estado === 'Reservada'
-                          ? '#FFCC00'
-                          : '#34C759',
+                        retoma.estado === 'Concluída' ? '#8E8E93'
+                        : retoma.estado === 'Reservada' ? '#FFCC00'
+                        : '#34C759',
                     },
                   ]}
                 />
@@ -188,7 +229,7 @@ export default function DetalhesRetoma() {
             </View>
           </View>
 
-          {/* Capa (tap -> fullscreen) */}
+          {/* Capa */}
           {capa ? (
             <TouchableOpacity activeOpacity={0.9} onPress={() => openViewerAt(0)}>
               <Image source={{ uri: capa }} style={styles.cover} />
@@ -197,11 +238,7 @@ export default function DetalhesRetoma() {
 
           {/* Thumbs */}
           {thumbs.length > 0 && (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: 10, marginTop: 10 }}
-            >
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, marginTop: 10 }}>
               {thumbs.map((url, idx) => (
                 <TouchableOpacity key={url} onPress={() => openViewerAt(idx + 1)} activeOpacity={0.85}>
                   <Image source={{ uri: url }} style={styles.thumb} />
@@ -340,22 +377,13 @@ export default function DetalhesRetoma() {
       >
         <View style={styles.modalRoot}>
           <View style={styles.modalBackdrop} />
+          <Image source={{ uri: gallery[viewerIndex] }} style={styles.viewerImage} resizeMode="contain" />
 
-          {/* A imagem vem primeiro (fica por baixo dos botões) */}
-          <Image
-            source={{ uri: gallery[viewerIndex] }}
-            style={styles.viewerImage}
-            resizeMode="contain"
-          />
-
-          {/* Overlay com botões e zonas de navegação */}
           <View style={styles.overlay} pointerEvents="box-none">
-            {/* fechar */}
             <TouchableOpacity style={styles.viewerClose} onPress={closeViewer} hitSlop={12}>
               <Ionicons name="close" size={28} color="#fff" />
             </TouchableOpacity>
 
-            {/* zona esquerda/direita (tap) */}
             {gallery.length > 1 && (
               <>
                 <Pressable
@@ -384,7 +412,6 @@ export default function DetalhesRetoma() {
               </>
             )}
 
-            {/* indicador */}
             <View style={styles.viewerIndicator}>
               <Text style={{ color: '#fff', fontWeight: '700' }}>
                 {viewerIndex + 1} / {gallery.length}
@@ -415,9 +442,7 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 20, fontWeight: '700' },
   content: { padding: 16, paddingBottom: 120 },
 
-  card: {
-    borderRadius: 14, padding: 16, marginBottom: 16, elevation: 2,
-  },
+  card: { borderRadius: 14, padding: 16, marginBottom: 16, elevation: 2 },
   row: { flexDirection: 'row', alignItems: 'center' },
   iconCircle: {
     width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center',
@@ -457,31 +482,18 @@ const styles = StyleSheet.create({
   // Fullscreen viewer
   modalRoot: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: '#000000E6' },
-
   viewerImage: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%' },
-
   overlay: { ...StyleSheet.absoluteFillObject },
-
   viewerClose: { position: 'absolute', top: 46, right: 16, padding: 10 },
 
   navZone: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    width: '35%',
-    justifyContent: 'center',
-    alignItems: 'center',
+    position: 'absolute', top: 0, bottom: 0, width: '35%', justifyContent: 'center', alignItems: 'center',
   },
   leftZone: { left: 0 },
   rightZone: { right: 0 },
 
   viewerIndicator: {
-    position: 'absolute',
-    bottom: 30,
-    alignSelf: 'center',
-    backgroundColor: '#00000080',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
+    position: 'absolute', bottom: 30, alignSelf: 'center', backgroundColor: '#00000080',
+    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999,
   },
 });

@@ -1,7 +1,12 @@
 // app/SharedScreens/Perfil.tsx
 import { useUserDoc } from '@/hooks/useUserDoc';
 import { useAuth } from '@/services/AuthContext';
-import { subscribeUserStats, type UserStats } from '@/services/FirestoreService';
+import {
+  subscribeMinhasRetomas,
+  subscribeUserStats,
+  type RetomaDoc,
+  type UserStats,
+} from '@/services/FirestoreService';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -33,13 +38,28 @@ export default function Perfil() {
   // stats em tempo-real: pontos criados + reportes submetidos
   const [stats, setStats] = useState<UserStats>({ pontosCriados: 0, reportes: 0 });
 
+  // contagem de retomas do utilizador
+  const [myRetomasCount, setMyRetomasCount] = useState<number>(0);
+
+  // tab local: histórico | favoritos
+  const [activeTab, setActiveTab] = useState<'historico' | 'favoritos'>('historico');
+
   useEffect(() => {
     if (!user?.uid) return;
     const unsub = subscribeUserStats(user.uid, setStats);
     return () => unsub();
   }, [user?.uid]);
 
-  const totalRetomas = stats.pontosCriados + stats.reportes;
+  useEffect(() => {
+    if (!user?.uid) return;
+    const unsub = subscribeMinhasRetomas({
+      uid: user.uid,
+      onData: (list: RetomaDoc[]) => setMyRetomasCount(list.length),
+    });
+    return () => unsub();
+  }, [user?.uid]);
+
+  const totalIntervencoes = stats.pontosCriados + stats.reportes;
 
   return (
     <View style={[styles.wrapper, { backgroundColor: THEME.dark.bgOther }]}>
@@ -70,7 +90,12 @@ export default function Perfil() {
             style={[styles.avatar, { backgroundColor: T.card }]}
           />
         ) : (
-          <View style={[styles.avatar, { backgroundColor: T.card, alignItems: 'center', justifyContent: 'center' }]}>
+          <View
+            style={[
+              styles.avatar,
+              { backgroundColor: T.card, alignItems: 'center', justifyContent: 'center' },
+            ]}
+          >
             <Feather name="user" size={48} color={T.textMuted} />
           </View>
         )}
@@ -86,37 +111,94 @@ export default function Perfil() {
       <View style={styles.statsSection}>
         <View style={[styles.statBox, { backgroundColor: T.card, borderColor: T.border }]}>
           <Text style={[styles.statNumber, { color: BRAND.primary }]}>
-            {loading ? '—' : totalRetomas}
+            {loading ? '—' : totalIntervencoes}
           </Text>
           <Text style={[styles.statLabel, { color: T.textInput }]}>Intervenções</Text>
           <Text style={{ color: T.textMuted, marginTop: 4, fontSize: 12 }}>
-            {`${stats.pontosCriados} EcoPs + ${stats.reportes} Reportes`}
+            {`${stats.pontosCriados} EcoPts + ${stats.reportes} Reportes`}
           </Text>
         </View>
+
+        {/* Substituído: "1240 Pontos" -> nº total de retomas do utilizador */}
         <View style={[styles.statBox, { backgroundColor: T.card, borderColor: T.border }]}>
-          <Text style={[styles.statNumber, { color: BRAND.primary }]}>1240</Text>
-          <Text style={[styles.statLabel, { color: T.textInput }]}>Pontos</Text>
+          <Text style={[styles.statNumber, { color: BRAND.primary }]}>
+            {loading ? '—' : myRetomasCount}
+          </Text>
+          <Text style={[styles.statLabel, { color: T.textInput }]}>Retomas</Text>
+          <Text style={{ color: T.textMuted, marginTop: 4, fontSize: 12 }}>
+            Criadas
+          </Text>
         </View>
       </View>
 
-      {/* Histórico */}
-      <View style={styles.historySection}>
-        <Text style={[styles.historyTitle, { color: T.text }]}>Histórico</Text>
-
+      {/* Tabs: Histórico / Favoritos */}
+      <View style={[styles.tabs, { backgroundColor: T.card, borderColor: T.border }]}>
         <TouchableOpacity
-          style={[styles.historyItem, { backgroundColor: T.card, borderColor: T.border }]}
+          style={[
+            styles.tabBtn,
+            activeTab === 'historico' && { backgroundColor: T.border },
+          ]}
+          onPress={() => setActiveTab('historico')}
         >
-          <Text style={[styles.historyText, { color: T.textInput }]}>Histórico de Recompensas</Text>
-          <Feather name="chevron-right" size={18} color={T.icon} />
+          <Text
+            style={[
+              styles.tabText,
+              { color: activeTab === 'historico' ? T.text : T.textMuted },
+            ]}
+          >
+            Histórico
+          </Text>
         </TouchableOpacity>
-
         <TouchableOpacity
-          style={[styles.historyItem, { backgroundColor: T.card, borderColor: T.border }]}
+          style={[styles.tabBtn, activeTab === 'favoritos' && { backgroundColor: T.border }]}
+          onPress={() => setActiveTab('favoritos')}
         >
-          <Text style={[styles.historyText, { color: T.textInput }]}>Histórico de Reciclagem</Text>
-          <Feather name="chevron-right" size={18} color={T.icon} />
+          <Text
+            style={[
+              styles.tabText,
+              { color: activeTab === 'favoritos' ? T.text : T.textMuted },
+            ]}
+          >
+            Favoritos
+          </Text>
         </TouchableOpacity>
       </View>
+
+      {/* Conteúdo das tabs */}
+      {activeTab === 'historico' ? (
+        <View style={styles.historySection}>
+          <TouchableOpacity
+            style={[styles.historyItem, { backgroundColor: T.card, borderColor: T.border }]}
+          >
+            <Text style={[styles.historyText, { color: T.textInput }]}>
+              Histórico de Recompensas
+            </Text>
+            <Feather name="chevron-right" size={18} color={T.icon} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.historyItem, { backgroundColor: T.card, borderColor: T.border }]}
+          >
+            <Text style={[styles.historyText, { color: T.textInput }]}>
+              Histórico de Reciclagem
+            </Text>
+            <Feather name="chevron-right" size={18} color={T.icon} />
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View style={styles.favSection}>
+          <Text style={[styles.favInfo, { color: T.textMuted }]}>
+            Guarda aqui retomas ou ecopontos para acesso rápido.
+          </Text>
+          <TouchableOpacity
+            style={[styles.favBtn, { backgroundColor: BRAND.primary }]}
+            onPress={() => router.push('/UserScreens/favoritos')}
+          >
+            <Feather name="star" size={18} color="#fff" />
+            <Text style={styles.favBtnText}>Ver Favoritos</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }
@@ -175,7 +257,7 @@ const styles = StyleSheet.create({
   statsSection: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginBottom: 30,
+    marginBottom: 18,
   },
   statBox: {
     flex: 1,
@@ -194,14 +276,26 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
 
-  historySection: {
-    marginTop: 10,
-    gap: 12,
+  tabs: {
+    flexDirection: 'row',
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
+    marginBottom: 14,
   },
-  historyTitle: {
-    fontSize: 22,
-    fontWeight: '600',
-    marginBottom: 4,
+  tabBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+
+  historySection: {
+    marginTop: 4,
+    gap: 12,
   },
   historyItem: {
     flexDirection: 'row',
@@ -214,5 +308,28 @@ const styles = StyleSheet.create({
   },
   historyText: {
     fontSize: 16,
+  },
+
+  favSection: {
+    marginTop: 6,
+    alignItems: 'center',
+  },
+  favInfo: {
+    fontSize: 14,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  favBtn: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+  },
+  favBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
   },
 });
