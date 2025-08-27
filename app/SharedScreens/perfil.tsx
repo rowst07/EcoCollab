@@ -88,7 +88,7 @@ export default function Perfil() {
           <Text style={[styles.statNumber, { color: BRAND.primary }]}>
             {loading ? '—' : totalRetomas}
           </Text>
-          <Text style={[styles.statLabel, { color: T.textInput }]}>Retomas</Text>
+          <Text style={[styles.statLabel, { color: T.textInput }]}>Intervenções</Text>
           <Text style={{ color: T.textMuted, marginTop: 4, fontSize: 12 }}>
             {`${stats.pontosCriados} EcoPs + ${stats.reportes} Reportes`}
           </Text>

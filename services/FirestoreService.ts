@@ -31,6 +31,8 @@ export type UserMinimalDoc = {
   role: Role;                 // 'user' | 'moderator' | 'admin'
   dataCriacao: any;           // serverTimestamp()
   dataAtualizacao: any;       // serverTimestamp()
+  status?: 'active' | 'inactive';
+  deactivatedAt?: any | null; // serverTimestamp() quando inativado
 };
 
 export function userRef(uid: string) {
@@ -49,6 +51,8 @@ export async function createUserDocumentStrict(
     email: data.email,
     morada: data.morada,
     role: data.role,
+    status: 'active',
+    deactivatedAt: null,
     dataCriacao: serverTimestamp(),
     dataAtualizacao: serverTimestamp(),
   };
@@ -64,7 +68,7 @@ export async function userDocumentExists(uid: string): Promise<boolean> {
 /** Atualiza perfil mínimo permitido. */
 export async function updateUserMinimalDoc(
   uid: string,
-  data: Partial<Pick<UserMinimalDoc, 'nome' | 'email' | 'morada'>>
+  data: Partial<Pick<UserMinimalDoc, 'nome' | 'email' | 'morada' | 'status' | 'deactivatedAt'>>
 ) {
   await updateDoc(userRef(uid), { ...data, dataAtualizacao: serverTimestamp() });
 }
@@ -78,7 +82,7 @@ export async function getUserMinimalDoc(uid: string) {
 export type UserExtras = {
   telemovel?: string;
   fotoURL?: string;
-  dataNasc?: string;
+  dataNasc?: string; // YYYY-MM-DD
 };
 
 /** Atualiza campos “extras” do perfil (sem mexer em role/id/dataCriacao). */
@@ -132,6 +136,26 @@ export async function getAllUsersOnce(): Promise<(UserMinimalDoc & UserExtras)[]
     (d) => ({ id: d.id, ...(d.data() as any) }) as UserMinimalDoc & UserExtras
   );
 }
+
+/** Marca a conta como inativa (não apaga) */
+export async function deactivateAccount(uid: string) {
+  await updateDoc(userRef(uid), {
+    status: 'inactive',
+    deactivatedAt: serverTimestamp(),
+    dataAtualizacao: serverTimestamp(),
+  });
+}
+
+/** Guard simples: dispara callback quando status === 'inactive' */
+export function subscribeUserInactiveGuard(uid: string, onInactive: () => void): Unsubscribe {
+  return onSnapshot(userRef(uid), (snap) => {
+    if (!snap.exists()) return;
+    const d = snap.data() as UserMinimalDoc;
+    if (d.status === 'inactive') onInactive?.();
+  });
+}
+
+
 
 // ===================== PONTOS DE RECOLHA =====================
 

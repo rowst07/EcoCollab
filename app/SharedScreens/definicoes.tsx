@@ -1,3 +1,4 @@
+// app/SharedScreens/definicoes.tsx
 import { useAuth } from '@/services/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -13,47 +14,42 @@ import {
   View
 } from 'react-native';
 
-import { SimpleSelect } from '@/components/SimpleSelect';
-import { useTheme, useThemeColor } from '@/hooks/useThemeColor';
+import ChangeEmailModal from '@/components/modals/ChangeEmailModal';
+import ChangePasswordModal from '@/components/modals/ChangePassModal';
+import DeactivateAccountModal from '@/components/modals/DesativarContaModal';
+import { useThemeColor } from '@/hooks/useThemeColor';
 
 export default function Definicoes() {
   const router = useRouter();
-  const { signOutApp } = useAuth();
+  const { signOutApp, user } = useAuth();
 
-  // Tema atual
-  const t = useTheme();
+  // Cores do tema
   const bg = useThemeColor('bg');
   const text = useThemeColor('text');
   const muted = useThemeColor('textMuted');
-  const card = useThemeColor('card');
-  const border = useThemeColor('border');
 
-  // Estado local (liga depois a store/AsyncStorage se quiseres)
-  const [tema, setTema] = useState<'dark'|'system'|'light'>('dark'); // predefinido escuro
-  const [idioma, setIdioma] = useState<'pt'|'en'>('pt');
-  const [mapType, setMapType] = useState<'standard'|'satellite'|'hybrid'|'terrain'>('standard');
-  const [unidades, setUnidades] = useState<'km'|'mi'>('km');
-
+  // Notificações & privacidade (mantidos)
   const [notif, setNotif] = useState(true);
   const [alertaProximidade, setAlertaProximidade] = useState(false);
-
-  const [cluster, setCluster] = useState(true);
-  const [trafego, setTrafego] = useState(false);
-
   const [analytics, setAnalytics] = useState(true);
 
+  // Estado dos modais
+  const [openEmail, setOpenEmail] = useState(false);
+  const [openPass, setOpenPass] = useState(false);
+  const [openDeactivate, setOpenDeactivate] = useState(false);
+
   const abrirDefinicoesSistema = async () => {
-    try {
-      await Linking.openSettings();
-    } catch {
-      Alert.alert('Aviso', 'Não foi possível abrir as definições do sistema.');
-    }
+    try { await Linking.openSettings(); }
+    catch { Alert.alert('Aviso', 'Não foi possível abrir as definições do sistema.'); }
   };
 
   const terminarSessao = () => {
     Alert.alert('Terminar sessão', 'Tens a certeza que queres terminar sessão?', [
       { text: 'Cancelar', style: 'cancel' },
-      { text: 'Terminar', style: 'destructive', onPress: async () => {
+      {
+        text: 'Terminar',
+        style: 'destructive',
+        onPress: async () => {
           try {
             await signOutApp();
             router.replace('/SharedScreens/login');
@@ -65,18 +61,9 @@ export default function Definicoes() {
     ]);
   };
 
-  const eliminarConta = () => {
-    Alert.alert('Eliminar conta', 'Esta ação é permanente. Continuar?', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Eliminar', style: 'destructive', onPress: () => console.log('delete-account') }
-    ]);
-  };
-
-  const limparHistorico = () => {
-    Alert.alert('Limpar histórico', 'Queres limpar a pesquisa recente?', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Limpar', style: 'destructive', onPress: () => console.log('clear-history') }
-    ]);
+  const onDeactivated = async () => {
+    try { await signOutApp(); } catch {}
+    router.replace('/SharedScreens/login');
   };
 
   return (
@@ -93,63 +80,10 @@ export default function Definicoes() {
       <ScrollView contentContainerStyle={{ paddingBottom: 28 }}>
         {/* Conta */}
         <Section title="Conta">
-          <Item onPress={() => console.log('Mudar Pass')} icon="key-outline" label="Alterar palavra‑passe" />
+          <Item onPress={() => setOpenEmail(true)} icon="mail-outline" label="Alterar email" />
+          <Item onPress={() => setOpenPass(true)} icon="key-outline" label="Alterar palavra-passe" />
           <Item onPress={terminarSessao} icon="log-out-outline" label="Terminar sessão" danger />
-          <Item onPress={eliminarConta} icon="trash-outline" label="Eliminar conta" danger />
-        </Section>
-
-        {/* Preferências */}
-        <Section title="Preferências">
-          <Row label="Tema">
-            <SimpleSelect
-              value={tema}
-              onChange={v => setTema(v as any)}
-              options={[
-                { value: 'dark', label: 'Escuro' },
-                { value: 'system', label: 'Sistema' },
-                { value: 'light', label: 'Claro' }
-              ]}
-            />
-          </Row>
-          <Row label="Idioma">
-            <SimpleSelect
-              value={idioma}
-              onChange={v => setIdioma(v as any)}
-              options={[
-                { value: 'pt', label: 'Português' },
-                { value: 'en', label: 'English' }
-              ]}
-            />
-          </Row>
-          <Row label="Tipo de mapa">
-            <SimpleSelect
-              value={mapType}
-              onChange={v => setMapType(v as any)}
-              options={[
-                { value: 'standard', label: 'Padrão' },
-                { value: 'satellite', label: 'Satélite' },
-                { value: 'hybrid', label: 'Híbrido' },
-                { value: 'terrain', label: 'Terreno' }
-              ]}
-            />
-          </Row>
-          <Row label="Unidades">
-            <SimpleSelect
-              value={unidades}
-              onChange={v => setUnidades(v as any)}
-              options={[
-                { value: 'km', label: 'Quilómetros (km)' },
-                { value: 'mi', label: 'Milhas (mi)' }
-              ]}
-            />
-          </Row>
-        </Section>
-
-        {/* Mapa */}
-        <Section title="Mapa">
-          <ToggleRow label="Clustering de marcadores" value={cluster} onValueChange={setCluster} />
-          <ToggleRow label="Mostrar trânsito" value={trafego} onValueChange={setTrafego} />
-          <Item onPress={limparHistorico} icon="time-outline" label="Limpar histórico de pesquisa" />
+          <Item onPress={() => setOpenDeactivate(true)} icon="trash-outline" label="Desativar conta" danger />
         </Section>
 
         {/* Notificações */}
@@ -174,12 +108,30 @@ export default function Definicoes() {
           </View>
         </Section>
       </ScrollView>
+
+      {/* Modais */}
+      <ChangeEmailModal
+        visible={openEmail}
+        onClose={() => setOpenEmail(false)}
+        initialEmail={user?.email ?? ''}
+      />
+      <ChangePasswordModal
+        visible={openPass}
+        onClose={() => setOpenPass(false)}
+      />
+      <DeactivateAccountModal
+        visible={openDeactivate}
+        onClose={() => setOpenDeactivate(false)}
+        onDeactivated={onDeactivated}
+      />
     </View>
   );
 }
 
 /** --------------------- Componentes UI --------------------- */
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+import ReactNode = React.ReactNode;
+
+function Section({ title, children }: { title: string; children: ReactNode }) {
   const textMuted = useThemeColor('textMuted');
   const card = useThemeColor('card');
   const border = useThemeColor('border');
@@ -205,7 +157,6 @@ function Item({
 }) {
   const text = useThemeColor('text');
   const border = useThemeColor('hairline');
-  const card = useThemeColor('card');
 
   return (
     <TouchableOpacity
@@ -222,19 +173,6 @@ function Item({
   );
 }
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-  const textMuted = useThemeColor('textMuted');
-  const border = useThemeColor('hairline');
-  const card = useThemeColor('card');
-
-  return (
-    <View style={[styles.row, { borderBottomColor: border, backgroundColor: '#000' }]}>
-      <Text style={[styles.rowLabel, { color: textMuted }]}>{label}</Text>
-      <View style={{ flex: 1 }}>{children}</View>
-    </View>
-  );
-}
-
 function ToggleRow({
   label,
   value,
@@ -244,14 +182,12 @@ function ToggleRow({
   value: boolean;
   onValueChange: (v: boolean) => void;
 }) {
-  const text = useThemeColor('text');
   const border = useThemeColor('hairline');
-  const card = useThemeColor('card');
 
   return (
-  <View style={[styles.item, { borderBottomColor: border, backgroundColor: '#18181B' }]}> 
+    <View style={[styles.item, { borderBottomColor: border, backgroundColor: '#18181B' }]}>
       <View style={styles.itemLeft}>
-  <Text style={[styles.itemLabel, { color: '#fff' }]}>{label}</Text>
+        <Text style={[styles.itemLabel, { color: '#fff' }]}>{label}</Text>
       </View>
       <Switch
         value={value}
@@ -308,16 +244,6 @@ const styles = StyleSheet.create({
   },
   itemLabel: {
     fontSize: 16,
-    fontWeight: '600'
-  },
-  row: {
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    borderBottomWidth: 1
-  },
-  rowLabel: {
-    fontSize: 13,
-    marginBottom: 8,
     fontWeight: '600'
   },
   versionBox: {

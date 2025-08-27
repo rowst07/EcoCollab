@@ -1,6 +1,10 @@
 // hooks/useUserDoc.ts
 import { useAuth } from '@/services/AuthContext';
-import { subscribeUserDoc, type UserExtras, type UserMinimalDoc } from '@/services/FirestoreService';
+import {
+  subscribeUserDoc,
+  type UserExtras,
+  type UserMinimalDoc,
+} from '@/services/FirestoreService';
 import { useEffect, useState } from 'react';
 
 export type FullUserDoc = UserMinimalDoc & UserExtras;
@@ -17,7 +21,7 @@ export function useUserDoc() {
       return;
     }
     const unsub = subscribeUserDoc(user.uid, (d) => {
-      setDoc(d);
+      setDoc(d as FullUserDoc | null);
       setLoading(false);
     });
     return unsub;

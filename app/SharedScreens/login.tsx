@@ -1,3 +1,4 @@
+import RecoverPassModal from '@/components/modals/RecoverPassModal';
 import { useAuth } from '@/services/AuthContext';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -19,11 +20,12 @@ import {
 export default function Login() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const { signIn, resetPassword } = useAuth();
+  const { signIn } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [recoverOpen, setRecoverOpen] = useState(false);
 
   return (
     <KeyboardAvoidingView
@@ -77,17 +79,8 @@ export default function Login() {
                 />
               </TouchableOpacity>
             </View>
-            <TouchableOpacity>
-              <Text 
-                style={styles.forgotPasswordText}
-                onPress={async () => {
-                  try {
-                    await resetPassword(email);
-                    Alert.alert('Verifique o seu email para redefinir a palavra-passe.');
-                  } catch (error: any) {
-                    Alert.alert('Erro ao redefinir a palavra-passe: ', error);
-                  }
-                }}>Esqueceu-se da palavra-passe?</Text>
+            <TouchableOpacity onPress={() => setRecoverOpen(true)}>
+              <Text style={styles.forgotPasswordText}>Esqueceu-se da palavra-passe?</Text>
             </TouchableOpacity>
           </View>
 
@@ -134,6 +127,11 @@ export default function Login() {
           </View>
         </View>
       </ScrollView>
+      <RecoverPassModal
+        visible={recoverOpen}
+        onClose={() => setRecoverOpen(false)}
+        initialEmail={email}
+      />
     </KeyboardAvoidingView>
   );
 }
