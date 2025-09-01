@@ -155,7 +155,7 @@ export default function AdminHomeWeb() {
   const [usersCount, setUsersCount] = useState(0);
   const [reportsPendentes, setReportsPendentes] = useState(0);
   const [retomasAtivas, setRetomasAtivas] = useState(0);
-  const [retomasTotal, setRetomasTotal] = useState(0);     // << NOVO
+  const [retomasTotal, setRetomasTotal] = useState(0);
   const [pontosCount, setPontosCount] = useState(0);
 
   // breakdowns (gráficos)
@@ -166,6 +166,11 @@ export default function AdminHomeWeb() {
   const [repPend, setRepPend] = useState(0);
   const [repAprov, setRepAprov] = useState(0);
   const [repReprov, setRepReprov] = useState(0);
+
+  // retomas por tipo
+  const [retomasDoacao, setRetomasDoacao] = useState(0);
+  const [retomasTroca, setRetomasTroca] = useState(0);
+  const [retomasOutras, setRetomasOutras] = useState(0);
 
   const fetchCounts = useCallback(async () => {
     try {
@@ -181,18 +186,14 @@ export default function AdminHomeWeb() {
       const retomasAtivasSnap = await getCountFromServer(
         query(collection(db, "retomas"), where("estado", "==", "Ativa"))
       );
-      const retomasTotalSnap = await getCountFromServer(
-        collection(db, "retomas")
-      ); // << NOVO total
+      const retomasTotalSnap = await getCountFromServer(collection(db, "retomas"));
 
-      const pontosSnap = await getCountFromServer(
-        collection(db, "pontoRecolha")
-      );
+      const pontosSnap = await getCountFromServer(collection(db, "pontoRecolha"));
 
       setUsersCount(usersSnap.data().count);
       setReportsPendentes(reportsPendSnap.data().count);
       setRetomasAtivas(retomasAtivasSnap.data().count);
-      setRetomasTotal(retomasTotalSnap.data().count);      // << NOVO
+      setRetomasTotal(retomasTotalSnap.data().count);
       setPontosCount(pontosSnap.data().count);
 
       // Utilizadores por role
@@ -208,7 +209,7 @@ export default function AdminHomeWeb() {
       setMods(m);
       setUsersRestantes(Math.max(usersSnap.data().count - a - m, 0));
 
-      // Reports por estado
+      // Reports por estado (aceite/aprovado e rejeitado/reprovado)
       const aprovSnapA = await getCountFromServer(
         query(collection(db, "reportes"), where("status", "==", "aprovado"))
       );
@@ -225,6 +226,24 @@ export default function AdminHomeWeb() {
       setRepPend(reportsPendSnap.data().count);
       setRepAprov(aprovSnapA.data().count + aprovSnapB.data().count);
       setRepReprov(reprovSnapA.data().count + reprovSnapB.data().count);
+
+      // Retomas por tipo (tolerante a "Doacao")
+      const doacaoA = await getCountFromServer(
+        query(collection(db, "retomas"), where("tipo", "==", "Doação"))
+      );
+      const doacaoB = await getCountFromServer(
+        query(collection(db, "retomas"), where("tipo", "==", "Doacao"))
+      );
+      const troca = await getCountFromServer(
+        query(collection(db, "retomas"), where("tipo", "==", "Troca"))
+      );
+      const doacoes = doacaoA.data().count + doacaoB.data().count;
+      const trocas = troca.data().count;
+      const outras = Math.max(retomasTotalSnap.data().count - doacoes - trocas, 0);
+
+      setRetomasDoacao(doacoes);
+      setRetomasTroca(trocas);
+      setRetomasOutras(outras);
     } catch (e) {
       console.error("Dashboard counts error:", e);
     } finally {
@@ -255,18 +274,18 @@ export default function AdminHomeWeb() {
     [repPend, repAprov, repReprov]
   );
 
-  const retomasData = useMemo(() => {
-    const ativas = retomasAtivas;
-    const outras = Math.max(retomasTotal - ativas, 0); // Reservadas + Concluídas
-    return [
-      { name: "Ativas", value: ativas },
-      { name: "Outras", value: outras },
-    ];
-  }, [retomasAtivas, retomasTotal]);
+  const retomasTipoData = useMemo(
+    () => [
+      { name: "Doação", value: retomasDoacao },
+      { name: "Troca", value: retomasTroca },
+      { name: "Outras", value: retomasOutras },
+    ],
+    [retomasDoacao, retomasTroca, retomasOutras]
+  );
 
   const USER_COLORS = ["#16a34a", "#60a5fa", "#94a3b8"];
   const REPORT_COLORS = ["#f59e0b", "#22c55e", "#ef4444"];
-  const RETOMA_COLORS = ["#0ea5e9", "#94a3b8"]; // azul / cinza
+  const RETOMA_TIPO_COLORS = ["#22c55e", "#0ea5e9", "#94a3b8"]; // verde / azul / cinza
 
   return (
     <View style={{ width: "100%", maxWidth: 1200, alignSelf: "center" }}>
@@ -392,7 +411,7 @@ export default function AdminHomeWeb() {
             </ResponsiveContainer>
           </View>
 
-          {/* Retomas — Ativas vs Total */}
+          {/* Retomas — por tipo */}
           <View
             style={{
               flexGrow: 1,
@@ -405,12 +424,12 @@ export default function AdminHomeWeb() {
               padding: 12,
             }}
           >
-            <Text style={{ fontWeight: "700", marginBottom: 8 }}>Retomas — Ativas vs Total</Text>
+            <Text style={{ fontWeight: "700", marginBottom: 8 }}>Retomas — por tipo</Text>
             <ResponsiveContainer width="100%" height="90%">
               <PieChart>
-                <Pie data={retomasData} dataKey="value" nameKey="name" outerRadius={90}>
-                  {retomasData.map((_, i) => (
-                    <Cell key={`ret-${i}`} fill={RETOMA_COLORS[i % RETOMA_COLORS.length]} />
+                <Pie data={retomasTipoData} dataKey="value" nameKey="name" outerRadius={90}>
+                  {retomasTipoData.map((_, i) => (
+                    <Cell key={`ret-tipo-${i}`} fill={RETOMA_TIPO_COLORS[i % RETOMA_TIPO_COLORS.length]} />
                   ))}
                 </Pie>
                 <Tooltip />
