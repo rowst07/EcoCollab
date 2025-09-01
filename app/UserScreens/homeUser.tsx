@@ -1,9 +1,9 @@
+import MapView, { Callout, Marker, PROVIDER_GOOGLE } from "@/components/MapView";
 import PesquisaModal from '@/components/modals/PesquisaModal';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import MapView, { Callout, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 
 // 🔥 serviço Firestore
 import { MAP_STYLE_DARK } from '@/constants/Map';

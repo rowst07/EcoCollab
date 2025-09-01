@@ -1,0 +1,5 @@
+:root {
+  --card:#ffffff; --bg:#f6f8f5; --text:#0f172a; --muted:#64748b; --border:#e2e8f0; --primary:#16a34a;
+}
+html, body, #root { height:100%; background:var(--bg); color:var(--text); font-family: Inter, system-ui, Arial, sans-serif; }
+button { cursor: pointer; }

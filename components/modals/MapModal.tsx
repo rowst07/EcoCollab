@@ -1,8 +1,8 @@
+import MapView, { MapPressEvent, Marker } from "@/components/MapView";
 import { BRAND, MAP_STYLE, THEME } from '@/constants/Colors';
 import { Feather } from '@expo/vector-icons';
 import React, { useRef } from 'react';
 import { ActivityIndicator, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import MapView, { MapPressEvent, Marker } from 'react-native-maps';
 
 interface MapModalProps {
   visible: boolean;
@@ -24,7 +24,8 @@ export const MapModal: React.FC<MapModalProps> = ({
   const [coord, setCoord] = React.useState<{ lat: number; lng: number } | null>(initialCoord ?? null);
   const [address, setAddress] = React.useState('');
   const [fetching, setFetching] = React.useState(false);
-  const mapRef = useRef<MapView>(null);
+  const mapRef = useRef<any>(null);
+
 
   React.useEffect(() => {
     setCoord(initialCoord ?? null);

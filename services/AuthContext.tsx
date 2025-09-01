@@ -1,5 +1,5 @@
 // services/AuthContext.tsx
-import { auth } from '@/firebase';
+import { auth, db } from '@/firebase';
 import { Role, createUserDocumentStrict } from '@/services/FirestoreService';
 import {
   EmailAuthProvider,
@@ -15,41 +15,83 @@ import {
   signOut,
   updateProfile,
 } from 'firebase/auth';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { ReactNode, createContext, useContext, useEffect, useState } from 'react';
 
-type AuthContextType = {
+export type AuthContextType = {
   user: User | null;
   loading: boolean;
+
+  /** NOVO: role atual do utilizador (lido de /users/{uid}). */
+  role: Role | null;
+
+  /** Mantidos (mobile não parte) */
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (nome: string, email: string, password: string, morada: string, role: Role) => Promise<void>;
+  signUp: (
+    nome: string,
+    email: string,
+    password: string,
+    morada: string,
+    role: Role
+  ) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   signOutApp: () => Promise<void>;
-  /** Atualiza o email reautenticando com a password atual. Envia verificação se necessário. */
   changeEmail: (currentPassword: string, newEmail: string) => Promise<void>;
-  /** Atualiza a palavra-passe reautenticando com a password atual. */
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+
+  /** NOVO: alias conveniente para web/admin */
+  logout: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType>({} as any);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [role, setRole] = useState<Role | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const sub = onAuthStateChanged(auth, (u) => {
-      console.log('[Auth] onAuthStateChanged ->', !!u, u?.uid);
+    // Observa sessão
+    const unsubAuth = onAuthStateChanged(auth, (u) => {
       setUser(u);
-      setLoading(false);
+      setLoading(true); // vamos carregar o role a seguir
+
+      // Limpa subscrição anterior ao doc do utilizador
+      if (!u) {
+        setRole(null);
+        setLoading(false);
+        return;
+      }
+
+      // Observa /users/{uid} para obter o role em tempo real
+      const unsubDoc = onSnapshot(doc(db, 'users', u.uid), (snap) => {
+        const r = (snap.data()?.role as Role) ?? null;
+        setRole(r);
+        setLoading(false);
+      }, () => {
+        // Se falhar a leitura, não bloqueia a app
+        setRole(null);
+        setLoading(false);
+      });
+
+      // devolver cleanup para quando o utilizador mudar
+      return unsubDoc;
     });
-    return sub;
+
+    return () => unsubAuth();
   }, []);
 
   const signIn = async (email: string, password: string) => {
     await signInWithEmailAndPassword(auth, email.trim(), password);
   };
 
-  const signUp = async (nome: string, email: string, password: string, morada: string, role: Role) => {
+  const signUp = async (
+    nome: string,
+    email: string,
+    password: string,
+    morada: string,
+    role: Role
+  ) => {
     // 1) cria conta
     const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
 
@@ -75,15 +117,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await signOut(auth);
   };
 
+  // alias para conveniência no web
+  const logout = signOutApp;
+
   const changeEmail = async (currentPassword: string, newEmail: string) => {
     const u = auth.currentUser;
     if (!u?.email) throw new Error('Utilizador não autenticado.');
-    // Reautenticar
     const cred = EmailAuthProvider.credential(u.email, currentPassword);
     await reauthenticateWithCredential(u, cred);
-    // Atualizar email
     await fbUpdateEmail(u, newEmail.trim());
-    // Enviar verificação se necessário
     if (!u.emailVerified) {
       await sendEmailVerification(u);
     }
@@ -92,16 +134,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const changePassword = async (currentPassword: string, newPassword: string) => {
     const u = auth.currentUser;
     if (!u?.email) throw new Error('Utilizador não autenticado.');
-    // Reautenticar
     const cred = EmailAuthProvider.credential(u.email, currentPassword);
     await reauthenticateWithCredential(u, cred);
-    // Atualizar password
     await fbUpdatePassword(u, newPassword);
   };
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, signIn, signUp, resetPassword, signOutApp, changeEmail, changePassword }}
+      value={{
+        user,
+        loading,
+        role,           // NOVO
+        signIn,
+        signUp,
+        resetPassword,
+        signOutApp,
+        changeEmail,
+        changePassword,
+        logout,         // NOVO (alias)
+      }}
     >
       {children}
     </AuthContext.Provider>

@@ -1,4 +1,5 @@
 // components/modals/CriarRetomaModal.tsx
+import MapView, { MapPressEvent, Marker, Region } from '@/components/MapView';
 import { THEME } from '@/constants/Colors';
 import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -21,7 +22,6 @@ import {
   View,
   useColorScheme,
 } from 'react-native';
-import MapView, { MapPressEvent, Marker, Region } from 'react-native-maps';
 
 import { auth } from '@/firebase'; // garante que exportas { auth, db } daqui
 import { addRetoma } from '@/services/FirestoreService';
@@ -91,7 +91,7 @@ export default function NovaRetomaModal({
     }
     const pos = await Location.getCurrentPositionAsync({});
     const { latitude, longitude } = pos.coords;
-    setRegion((r) => ({ ...r, latitude, longitude }));
+    setRegion((r: Region) => ({ ...r, latitude, longitude }));
     setMarker({ latitude, longitude });
   };
 
@@ -356,7 +356,7 @@ export default function NovaRetomaModal({
                     <Marker
                       coordinate={marker}
                       draggable
-                      onDragEnd={(e) => setMarker(e.nativeEvent.coordinate)}
+                      onDragEnd={(e: MapPressEvent) => setMarker(e.nativeEvent.coordinate)}
                     />
                   )}
                 </MapView>
