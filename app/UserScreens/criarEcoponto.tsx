@@ -169,7 +169,7 @@ export default function CriarEcoponto() {
           {/* Foto */}
           <View style={styles.photoRow}>
             <Image
-              source={form.photoUri ? { uri: form.photoUri } : require('../../assets/placeholder.png')}
+              source={form.photoUri ? { uri: form.photoUri } : undefined}
               style={[styles.photo, { backgroundColor: T.card }]}
             />
             <View style={styles.photoBtns}>

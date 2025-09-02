@@ -3,11 +3,10 @@ import {
   Modal,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
 import { RESIDUE_COLORS, THEME } from '../../constants/Colors';
 
@@ -137,21 +136,6 @@ export default function PesquisaModal({
                   ))}
               </View>
 
-              {/* Apenas com foto */}
-              <View style={[styles.switchRow, { marginTop: 6 }]}>
-                <Text style={styles.subTitle}>Apenas com foto</Text>
-                <Switch
-                  value={comFoto}
-                  onValueChange={(v) => {
-                    setFiltros((prev: any) => ({ ...prev, comFoto: Boolean(v) }));
-                    // Se quiseres aplicar logo a pesquisa ao mudar o switch, descomenta:
-                    // aplicarPesquisa?.();
-                  }}
-                  trackColor={{ true: colors.primary, false: colors.border }}
-                  thumbColor={comFoto ? '#fff' : '#eee'}
-                />
-              </View>
-
               {/* Classificação mínima */}
               <Text style={styles.subTitle}>Classificação mínima</Text>
               <View style={styles.rowWrap}>
@@ -165,42 +149,6 @@ export default function PesquisaModal({
                       style={[styles.chipText, filtros.classificacao === c && styles.chipTextAtivo]}
                     >
                       {c === 'todos' ? 'Todos' : `≥ ${c}★`}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              {/* Estado */}
-              <Text style={styles.subTitle}>Estado</Text>
-              <View style={styles.rowWrap}>
-                {(['aprovado', 'pendente', 'todos'] as const).map((val) => (
-                  <TouchableOpacity
-                    key={val}
-                    onPress={() => setFiltro('status', val)}
-                    style={[styles.chip, status === val && styles.chipAtivo]}
-                  >
-                    <Text style={[styles.chipText, status === val && styles.chipTextAtivo]}>
-                      {val[0].toUpperCase() + val.slice(1)}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              {/* Ordenar por */}
-              <Text style={styles.subTitle}>Ordenar por</Text>
-              <View style={styles.rowWrap}>
-                {(['recentes', 'antigos', 'nome'] as const).map((opt) => (
-                  <TouchableOpacity
-                    key={opt}
-                    onPress={() => setFiltro('ordenar', opt)}
-                    style={[styles.chip, ordenar === opt && styles.chipAtivo]}
-                  >
-                    <Text style={[styles.chipText, ordenar === opt && styles.chipTextAtivo]}>
-                      {opt === 'recentes'
-                        ? 'Mais recentes'
-                        : opt === 'antigos'
-                        ? 'Mais antigos'
-                        : 'Nome (A–Z)'}
                     </Text>
                   </TouchableOpacity>
                 ))}
