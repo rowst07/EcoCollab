@@ -1,8 +1,16 @@
-// app/AdminScreens/users/index.web.tsx
+// app/AdminScreens/(admin)/Users/index.web.tsx
 import { db } from "@/firebase";
 import { useAuth } from "@/services/AuthContext";
 import { setUserRole, toggleUserDisabled } from "@/services/functions";
-import { Link } from "expo-router";
+// ---- Link shim para Web (evita erro se 'expo-router' não estiver instalado) ----
+import React, { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
+type LinkProps = { href: string; style?: any; children?: React.ReactNode };
+const Link = ({ href, style, children }: LinkProps) => (
+  <a href={typeof href === "string" ? href : "#"} style={style as any}>
+    {children}
+  </a>
+);
+
 import {
   collection,
   limit,
@@ -11,7 +19,7 @@ import {
   query,
   Unsubscribe,
 } from "firebase/firestore";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import type { PressableStateCallbackType } from "react-native";
 import {
   ActivityIndicator,
   Pressable,
@@ -52,14 +60,17 @@ function Navbar() {
           <Text style={{ color: "var(--primary)" }}>Eco</Text>Collab Admin
         </Text>
         <View style={{ gap: 16, flexDirection: "row", alignItems: "center" }}>
-          <Link href={"/AdminScreens" as any} style={{ color: "var(--primary)" }}>Dashboard</Link>
-          <Link href={"/AdminScreens/users" as any} style={{ color: "var(--primary)", fontWeight: "700" }}>Users</Link>
-          <Link href={"/AdminScreens/reports" as any} style={{ color: "var(--primary)" }}>Reports</Link>
-          <Link href={"/AdminScreens/retomas" as any} style={{ color: "var(--primary)" }}>Retomas</Link>
+          <Link href={"/AdminScreens"} style={{ color: "var(--primary)" }}>Dashboard</Link>
+          <Link href={"/AdminScreens/users"} style={{ color: "var(--primary)", fontWeight: "700" }}>Users</Link>
+          <Link href={"/AdminScreens/reports"} style={{ color: "var(--primary)" }}>Reports</Link>
+          <Link href={"/AdminScreens/retomas"} style={{ color: "var(--primary)" }}>Retomas</Link>
           {user && (
             <Pressable
               onPress={logout}
-              style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: "#eaf4ee" }}
+              style={({ pressed }: PressableStateCallbackType) => [
+                { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: "#eaf4ee" },
+                pressed && { opacity: 0.9 },
+              ]}
             >
               <Text style={{ color: "#166534", fontWeight: "600" }}>Sair</Text>
             </Pressable>
@@ -76,13 +87,14 @@ function DateInput({
   value,
   onChange,
 }: { label: string; value: string; onChange: (v: string) => void }) {
+  const handleChange = (e: ChangeEvent<HTMLInputElement>) => onChange(e.target.value);
   return (
     <View style={{ gap: 6 }}>
       <Text style={styles.label}>{label}</Text>
       <input
         type="date"
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={handleChange}
         style={{
           padding: "10px 12px",
           borderRadius: 10,
@@ -110,10 +122,10 @@ function Button({
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [
+      style={(state: PressableStateCallbackType) => [
         styles.button,
         isGhost ? styles.buttonGhost : styles.buttonPrimary,
-        pressed && { opacity: 0.85 },
+        state.pressed && { opacity: 0.85 },
       ]}
     >
       <Text style={isGhost ? styles.buttonGhostText : styles.buttonPrimaryText}>
@@ -127,8 +139,7 @@ function Button({
 function toDateOnly(ts: any): Date | null {
   if (!ts && ts !== 0) return null;
   if (typeof ts?.toDate === "function") return ts.toDate(); // Firestore Timestamp
-  if (typeof ts === "object" && ts && typeof ts.seconds === "number")
-    return new Date(ts.seconds * 1000);
+  if (typeof ts === "object" && ts && typeof ts.seconds === "number") return new Date(ts.seconds * 1000);
   if (typeof ts === "number") return new Date(ts > 1e12 ? ts : ts * 1000);
   if (typeof ts === "string") return new Date(ts);
   if (ts instanceof Date) return ts;
@@ -258,7 +269,6 @@ function BarsChart({
   );
 }
 
-
 /* ---------- Página ---------- */
 export default function UsersPage() {
   const { loading: authLoading, role } = useAuth() as { loading?: boolean; role?: string };
@@ -278,6 +288,7 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<UserRow[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [search, setSearch] = useState<string>("");
   const unsubRef = useRef<Unsubscribe | null>(null);
 
   // map docs -> linhas (PRIORIDADE: dataCriacao)
@@ -290,22 +301,15 @@ export default function UsersPage() {
 
       const createdRaw =
         d?.dataCriacao ?? // <—— o teu campo
-        d?.createdAt ??
-        d?.created_at ??
-        d?.created ??
-        d?.signupAt ??
-        d?.registeredAt ??
-        d?.createdOn ??
-        d?.metadata?.creationTime ??
-        d?.userMetadata?.creationTime ??
+        d?.createdAt ?? d?.created_at ?? d?.created ?? d?.signupAt ?? d?.registeredAt ?? d?.createdOn ??
+        d?.metadata?.creationTime ?? d?.userMetadata?.creationTime ??
         d?.dataAtualizacao ?? // último recurso
         null;
 
       list.push({
         id: doc.id,
         email,
-        displayName:
-          d?.displayName || d?.name || d?.fullName || fallbackFromEmail || "-",
+        displayName: d?.displayName || d?.name || d?.fullName || fallbackFromEmail || "-",
         role: d?.role ?? "user",
         disabled: !!d?.disabled,
         createdAt: createdRaw,
@@ -318,100 +322,62 @@ export default function UsersPage() {
     if (authLoading) return;
 
     // 1) ordenar por dataCriacao
-    const qA = query(
-      collection(db, "users"),
-      orderBy("dataCriacao", "desc"),
-      limit(500)
-    );
+    const qA = query(collection(db, "users"), orderBy("dataCriacao", "desc"), limit(500));
     unsubRef.current = onSnapshot(
       qA,
       (snapA) => {
         let list = mapSnap(snapA);
-        if (list.length > 0) {
-          setRows(list);
-          setLoading(false);
-          return;
-        }
+        if (list.length > 0) { setRows(list); setLoading(false); return; }
         // 2) fallback: orderBy createdAt
-        const qB = query(
-          collection(db, "users"),
-          orderBy("createdAt", "desc"),
-          limit(500)
-        );
+        const qB = query(collection(db, "users"), orderBy("createdAt", "desc"), limit(500));
         unsubRef.current?.();
         unsubRef.current = onSnapshot(
           qB,
           (snapB) => {
             list = mapSnap(snapB);
-            if (list.length > 0) {
-              setRows(list);
-              setLoading(false);
-              return;
-            }
+            if (list.length > 0) { setRows(list); setLoading(false); return; }
             // 3) sem orderBy
             const qC = query(collection(db, "users"), limit(500));
             unsubRef.current?.();
-            unsubRef.current = onSnapshot(
-              qC,
-              (snapC) => {
-                setRows(mapSnap(snapC));
-                setLoading(false);
-              },
-              () => setLoading(false)
-            );
+            unsubRef.current = onSnapshot(qC, (snapC) => { setRows(mapSnap(snapC)); setLoading(false); }, () => setLoading(false));
           },
           () => setLoading(false)
         );
       },
       () => {
         // se falhar logo o qA (por falta de índice), tentamos os fallbacks
-        const qB = query(
-          collection(db, "users"),
-          orderBy("createdAt", "desc"),
-          limit(500)
-        );
-        unsubRef.current = onSnapshot(
-          qB,
-          (snapB) => {
-            const list = mapSnap(snapB);
-            if (list.length > 0) {
-              setRows(list);
-              setLoading(false);
-              return;
-            }
-            const qC = query(collection(db, "users"), limit(500));
-            unsubRef.current = onSnapshot(
-              qC,
-              (snapC) => {
-                setRows(mapSnap(snapC));
-                setLoading(false);
-              },
-              () => setLoading(false)
-            );
-          },
-          () => setLoading(false)
-        );
+        const qB = query(collection(db, "users"), orderBy("createdAt", "desc"), limit(500));
+        unsubRef.current = onSnapshot(qB, (snapB) => {
+          const list = mapSnap(snapB);
+          if (list.length > 0) { setRows(list); setLoading(false); return; }
+          const qC = query(collection(db, "users"), limit(500));
+          unsubRef.current = onSnapshot(qC, (snapC) => { setRows(mapSnap(snapC)); setLoading(false); }, () => setLoading(false));
+        }, () => setLoading(false));
       }
     );
 
-    return () => {
-      unsubRef.current?.();
-    };
+    return () => { unsubRef.current?.(); };
   }, [authLoading]);
 
-  // Lista filtrada por período (inclui SEM data)
+  // Lista filtrada por período (inclui SEM data) + pesquisa
   const filtered = useMemo(() => {
     const from = fromDate ? new Date(fromDate + "T00:00:00") : null;
     const to = toDate ? new Date(toDate + "T23:59:59") : null;
+    const q = search.trim().toLowerCase();
 
     return rows.filter((r) => {
       const d = toDateOnly(r.createdAt);
-      if (!d) return true; // se não houver data, mantemos
-      if (from && d < from) return false;
-      if (to && d > to) return false;
-      return true;
+      if (d) {
+        if (from && d < from) return false;
+        if (to && d > to) return false;
+      }
+      if (!q) return true;
+      return (
+        (r.displayName ?? "").toLowerCase().includes(q) ||
+        (r.email ?? "").toLowerCase().includes(q)
+      );
     });
-  }, [rows, fromDate, toDate]);
+  }, [rows, fromDate, toDate, search]);
 
   // KPIs (com fallback)
   const kpis = useMemo(() => {
@@ -452,9 +418,7 @@ export default function UsersPage() {
 
   // export CSV
   const handleExport = () => {
-    const rowsCsv: string[][] = [
-      ["UID", "Nome", "Email", "Role", "Estado", "Criado em (ISO)"],
-    ];
+    const rowsCsv: string[][] = [["UID", "Nome", "Email", "Role", "Estado", "Criado em (ISO)"]];
     filtered.forEach((u) => {
       const d = toDateOnly(u.createdAt);
       rowsCsv.push([
@@ -469,49 +433,32 @@ export default function UsersPage() {
     downloadCSV(`ecocollab_users_${fromDate}_a_${toDate}.csv`, rowsCsv);
   };
 
-  // ações (proteção opcional por admin)
+  // ações (proteção por admin)
   const onToggle = async (u: UserRow) => {
-    if (!isAdmin) {
-      alert("Sem permissão: apenas administradores podem ativar/desativar utilizadores.");
-      return;
-    }
+    if (!isAdmin) { alert("Sem permissão: apenas administradores podem ativar/desativar utilizadores."); return; }
     try {
       setBusyId(u.id);
       await toggleUserDisabled(u.id, !u.disabled);
-      setRows((prev) =>
-        prev.map((x) => (x.id === u.id ? { ...x, disabled: !u.disabled } : x))
-      );
+      setRows((prev) => prev.map((x) => (x.id === u.id ? { ...x, disabled: !u.disabled } : x)));
     } catch (e: any) {
       console.error("toggleUserDisabled failed", e);
       alert(`Falha ao atualizar o estado.\n${e.message || e}`);
-    } finally {
-      setBusyId(null);
-    }
+    } finally { setBusyId(null); }
   };
   const onRoleSelect = async (u: UserRow, value: string) => {
-    if (!isAdmin) {
-      alert("Sem permissão: apenas administradores podem alterar o papel.");
-      return;
-    }
+    if (!isAdmin) { alert("Sem permissão: apenas administradores podem alterar o papel."); return; }
     try {
       setBusyId(u.id);
       await setUserRole(u.id, value);
-      setRows((prev) =>
-        prev.map((x) => (x.id === u.id ? { ...x, role: value } : x))
-      );
+      setRows((prev) => prev.map((x) => (x.id === u.id ? { ...x, role: value } : x)));
     } catch (e: any) {
       console.error("setUserRole failed", e);
       alert(`Falha ao atualizar o papel.\n${e.message || e}`);
-    } finally {
-      setBusyId(null);
-    }
+    } finally { setBusyId(null); }
   };
 
   const total = rows.length;
-  const disabledCount = useMemo(
-    () => rows.filter((r) => r.disabled).length,
-    [rows]
-  );
+  const disabledCount = useMemo(() => rows.filter((r) => r.disabled).length, [rows]);
 
   return (
     <View style={{ width: "100%", maxWidth: 1200, alignSelf: "center" }}>
@@ -566,7 +513,8 @@ export default function UsersPage() {
             <Text style={styles.label}>Pesquisar</Text>
             <TextInput
               placeholder="Nome ou email…"
-              onChangeText={() => {}}
+              value={search}
+              onChangeText={setSearch}
               style={{
                 width: 260,
                 paddingHorizontal: 12,
@@ -659,42 +607,22 @@ export default function UsersPage() {
                     gap: 6,
                   }}
                 >
-                  <Text
-                    style={{ flex: 2 }}
-                    numberOfLines={1}
-                    ellipsizeMode="tail"
-                  >
+                  <Text style={{ flex: 2 }} numberOfLines={1} ellipsizeMode="tail">
                     {u.displayName || "-"}
                   </Text>
-                  <Text
-                    style={{ flex: 2 }}
-                    numberOfLines={1}
-                    ellipsizeMode="tail"
-                  >
+                  <Text style={{ flex: 2 }} numberOfLines={1} ellipsizeMode="tail">
                     {u.email || "-"}
                   </Text>
 
                   <View style={{ flex: 1 }}>
                     <View style={[styles.badge, styles.badgeNeutral]}>
-                      <Text style={styles.badgeTxt}>
-                        {(u.role || "user").toString()}
-                      </Text>
+                      <Text style={styles.badgeTxt}>{(u.role || "user").toString()}</Text>
                     </View>
                   </View>
 
                   <View style={{ flex: 1 }}>
-                    <View
-                      style={[
-                        styles.badge,
-                        u.disabled ? styles.badgeDanger : styles.badgeSuccess,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.badgeTxt,
-                          { color: u.disabled ? "#991b1b" : "#166534" },
-                        ]}
-                      >
+                    <View style={[styles.badge, u.disabled ? styles.badgeDanger : styles.badgeSuccess]}>
+                      <Text style={[styles.badgeTxt, { color: u.disabled ? "#991b1b" : "#166534" }]}>
                         {u.disabled ? "Desativado" : "Ativo"}
                       </Text>
                     </View>
@@ -732,10 +660,10 @@ export default function UsersPage() {
                     <Pressable
                       disabled={disableActions}
                       onPress={() => onToggle(u)}
-                      style={({ pressed }) => [
+                      style={(state: PressableStateCallbackType) => [
                         styles.btn,
                         u.disabled ? styles.btnEnable : styles.btnDisable,
-                        pressed && { opacity: 0.9 },
+                        state.pressed && { opacity: 0.9 },
                         disableActions && { opacity: 0.6 },
                       ]}
                     >
@@ -765,27 +693,9 @@ const styles = StyleSheet.create({
   label: { fontSize: 12, fontWeight: "700", opacity: 0.8 },
 
   // cards
-  card: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 16,
-    minWidth: 220,
-    boxShadow: "0 6px 16px rgba(0,0,0,0.06)" as any,
-  },
-  cardFull: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 16,
-    gap: 12,
-    boxShadow: "0 6px 16px rgba(0,0,0,0.06)" as any,
-  },
-  cardTitle: {
-    fontSize: 14,
-    fontWeight: "800",
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-    opacity: 0.9,
-  },
+  card: { backgroundColor: "#fff", borderRadius: 16, padding: 16, minWidth: 220, boxShadow: "0 6px 16px rgba(0,0,0,0.06)" as any },
+  cardFull: { backgroundColor: "#fff", borderRadius: 16, padding: 16, gap: 12, boxShadow: "0 6px 16px rgba(0,0,0,0.06)" as any },
+  cardTitle: { fontSize: 14, fontWeight: "800", textTransform: "uppercase", letterSpacing: 0.6, opacity: 0.9 },
   cardValue: { fontSize: 28, fontWeight: "900" },
 
   // buttons
@@ -796,56 +706,18 @@ const styles = StyleSheet.create({
   buttonGhostText: { color: "#111", fontWeight: "800" },
 
   // chart
-  chartCard: {
-    height: 280,
-    flexDirection: "row",
-    alignItems: "stretch",
-    gap: 8,
-    paddingTop: 4,
-    marginTop: 12,
-  },
+  chartCard: { height: 280, flexDirection: "row", alignItems: "stretch", gap: 8, paddingTop: 4, marginTop: 12 },
   yAxis: { width: 44, paddingTop: 8, paddingBottom: 16 },
   yTickRow: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6 },
   yTickLabel: { width: 20, textAlign: "right", fontSize: 11, opacity: 0.7 },
   yGridLine: { height: 1, backgroundColor: "#e5e7eb", flex: 1 },
-  barsWrap: {
-    flex: 1,
-    height: "100%",
-    paddingBottom: 18,
-    flexDirection: "row",
-    alignItems: "flex-end",
-    gap: 8,
-    borderLeftWidth: 1,
-    borderColor: "#e5e7eb",
-    position: "relative", // para o tooltip absoluto
-  },
-  barCol: {
-    flex: 1,
-    height: "100%",
-    alignItems: "center",
-    justifyContent: "flex-end",
-    position: "relative",
-  },
-  bar: {
-    width: "100%",
-    borderTopLeftRadius: 8,
-    borderTopRightRadius: 8,
-    backgroundColor: "#0f62fe22",
-    borderWidth: 1,
-    borderColor: "#0f62fe55",
-    transitionDuration: "120ms" as any,
-  },
+  barsWrap: { flex: 1, height: "100%", paddingBottom: 18, flexDirection: "row", alignItems: "flex-end", gap: 8, borderLeftWidth: 1, borderColor: "#e5e7eb", position: "relative" },
+  barCol: { flex: 1, height: "100%", alignItems: "center", justifyContent: "flex-end", position: "relative" },
+  bar: { width: "100%", borderTopLeftRadius: 8, borderTopRightRadius: 8, backgroundColor: "#0f62fe22", borderWidth: 1, borderColor: "#0f62fe55", transitionDuration: "120ms" as any },
   xTick: { marginTop: 6, fontSize: 10, opacity: 0.8 },
 
   // Tooltip
-  tooltipBubble: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: "rgba(17,24,39,0.92)", // quase preto
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.12)",
-  },
+  tooltipBubble: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: "rgba(17,24,39,0.92)", borderWidth: 1, borderColor: "rgba(255,255,255,0.12)" },
   tooltipTitle: { color: "#fff", fontSize: 12, fontWeight: "800" },
   tooltipValue: { color: "#fff", fontSize: 12 },
   tooltipStem: { width: 1, height: 10, backgroundColor: "rgba(17,24,39,0.4)" },
@@ -857,13 +729,7 @@ const styles = StyleSheet.create({
   td: { paddingVertical: 12, paddingHorizontal: 6, fontSize: 14 },
 
   // badges
-  badge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-    alignSelf: "flex-start",
-    borderWidth: 1,
-  },
+  badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, alignSelf: "flex-start", borderWidth: 1 },
   badgeNeutral: { backgroundColor: "white", borderColor: "#e5e7eb" },
   badgeSuccess: { backgroundColor: "#eaf4ee", borderColor: "#cbe7d4" },
   badgeDanger: { backgroundColor: "#fee2e2", borderColor: "#fecaca" },
