@@ -10,8 +10,6 @@ import {
   Alert,
   Dimensions,
   Image,
-  Linking,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -23,9 +21,12 @@ import {
 import { auth } from '@/firebase';
 import {
   subscribePontoRecolhaById,
-  updatePontoFavorito, // <— nova função no service
+  updatePontoFavorito,
   type PontoMarker
 } from '@/services/FirestoreService';
+
+// 👉 Planeador interno (context)
+import { useRoutePlanner } from '@/services/RoutePlannerContext';
 
 export default function DetalhesEcoponto() {
   const router = useRouter();
@@ -53,6 +54,9 @@ export default function DetalhesEcoponto() {
   const [loading, setLoading] = useState(true);
   const [favLoading, setFavLoading] = useState(false);
 
+  // Planeador de rotas (interno)
+  const { setDestination, addStop } = useRoutePlanner();
+
   // subscrição em tempo real ao documento
   useEffect(() => {
     if (!pontoId) return;
@@ -71,17 +75,6 @@ export default function DetalhesEcoponto() {
 
   const width = Dimensions.get('window').width;
   const height = Math.round((width * 9) / 16);
-
-  const abrirNavegacao = () => {
-    if (!eco?.latitude || !eco.longitude) return;
-    const { latitude: lat, longitude: lng, nome } = eco;
-    const label = encodeURIComponent(nome);
-    if (Platform.OS === 'ios') {
-      Linking.openURL(`http://maps.apple.com/?daddr=${lat},${lng}&q=${label}`);
-    } else {
-      Linking.openURL(`geo:${lat},${lng}?q=${lat},${lng}(${label})`);
-    }
-  };
 
   const renderEstrelas = (n?: number) => {
     const val = Math.max(0, Math.min(5, Math.floor(n ?? 0)));
@@ -119,6 +112,34 @@ export default function DetalhesEcoponto() {
   const editarPonto = () => {
     if (!isModOrAdmin || !pontoId) return;
     router.push({ pathname: '/ModScreens/editarEcoponto', params: { id: pontoId } });
+  };
+
+  // 👉 Ir para o local (no planeador interno)
+  const irParaLocal = () => {
+    if (!eco?.latitude || !eco?.longitude) {
+      return Alert.alert('Sem coordenadas', 'Este ecoponto não tem localização válida.');
+    }
+    setDestination({
+      id: eco.id,
+      nome: eco.nome,
+      lat: eco.latitude,
+      lng: eco.longitude
+    });
+    router.push('/UserScreens/planeadorRota'); // garante que este ecrã existe
+  };
+
+  // 👉 Adicionar como paragem (no planeador interno)
+  const adicionarComoParagem = () => {
+    if (!eco?.latitude || !eco?.longitude) {
+      return Alert.alert('Sem coordenadas', 'Este ecoponto não tem localização válida.');
+    }
+    addStop({
+      id: eco.id,
+      nome: eco.nome,
+      lat: eco.latitude,
+      lng: eco.longitude
+    });
+    router.push('/UserScreens/planeadorRota'); // garante que este ecrã existe
   };
 
   if (loading) {
@@ -242,13 +263,23 @@ export default function DetalhesEcoponto() {
 
           {/* Ações */}
           <View style={styles.actionsCol}>
+            {/* 👉 Agora usa o planeador interno */}
             <TouchableOpacity
               style={[styles.actionBtn, { backgroundColor: BRAND.primary }]}
-              onPress={abrirNavegacao}
+              onPress={irParaLocal}
               disabled={eco.latitude == null || eco.longitude == null}
             >
               <Ionicons name="navigate" size={20} color="#fff" />
               <Text style={styles.actionBtnText}>Ir para o local</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: BRAND.secondary }]}
+              onPress={adicionarComoParagem}
+              disabled={eco.latitude == null || eco.longitude == null}
+            >
+              <Ionicons name="add-circle-outline" size={20} color="#fff" />
+              <Text style={styles.actionBtnText}>Adicionar como paragem</Text>
             </TouchableOpacity>
 
             <TouchableOpacity

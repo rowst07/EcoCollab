@@ -1,13 +1,16 @@
 import { useProtectedRoute } from '@/hooks/useProtectedRoute';
 import { AuthProvider, useAuth } from '@/services/AuthContext';
 
+import { RoutePlannerProvider } from '@/services/RoutePlannerContext';
 import { Stack, usePathname } from 'expo-router';
 import BottomNavbar from '../components/bottomNavbar';
 
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <Layout />
+      <RoutePlannerProvider>
+        <Layout />
+      </RoutePlannerProvider>
     </AuthProvider>
   );
 }

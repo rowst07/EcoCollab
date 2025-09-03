@@ -11,7 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "config": {
-        "googleMapsApiKey": "AIzaSyD2DPKFX-oEM_kG_y5VhNjGxNLrd8TxEEA"
+        "googleMapsApiKey": "AIzaSyAS3d3T9sENBlWoop-edE_xv017wpvUqxE"
       }
     },
     "android": {
@@ -21,7 +21,12 @@
       },
       "edgeToEdgeEnabled": true,
       "softwareKeyboardLayoutMode": "resize",
-      "package": "com.brunorito.EcoCollab"
+      "package": "com.brunorito.EcoCollab",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyAS3d3T9sENBlWoop-edE_xv017wpvUqxE"
+        }
+      }
     },
     "web": {
       "bundler": "metro",
@@ -47,7 +52,8 @@
       "router": {},
       "eas": {
         "projectId": "55444c3f-3b35-43e8-a10c-21b2988824cb"
-      }
+      },
+      "googleDirectionsKey": "AIzaSyAEoeJ6NYPDy7uO0jy3ahRSeO26VqavI4o"
     }
   }
 }
