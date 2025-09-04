@@ -1,4 +1,5 @@
 // components/route/StopPickerModal.tsx
+import { BRAND, THEME } from '@/constants/Colors';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { subscribePontosRecolha, type PontoMarker } from '@/services/FirestoreService';
 import { Ionicons } from '@expo/vector-icons';
@@ -47,7 +48,7 @@ export const StopPickerModal: React.FC<Props> = ({ visible, onClose, onPick }) =
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.backdrop}>
-        <View style={[styles.sheet, { backgroundColor: card, borderColor: border }]}>
+        <View style={[styles.sheet, { backgroundColor: THEME.dark.bg, borderColor: border }]}>
           <View style={styles.sheetHeader}>
             <Text style={[styles.sheetTitle, { color: text }]}>Adicionar paragem</Text>
             <TouchableOpacity onPress={onClose}><Ionicons name="close" size={22} color={text} /></TouchableOpacity>
@@ -105,6 +106,6 @@ const styles = StyleSheet.create({
   search: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 10 },
   item: { flexDirection:'row', gap:10, alignItems:'center', paddingVertical: 10, borderBottomWidth: 1 },
   itemTitle: { fontWeight:'800' },
-  addBtn: { flexDirection:'row', alignItems:'center', gap:8, backgroundColor: '#2563eb', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10 },
+  addBtn: { flexDirection:'row', alignItems:'center', gap:8, backgroundColor: BRAND.primary, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10 },
   addTxt: { color:'#fff', fontWeight:'800' }
 });

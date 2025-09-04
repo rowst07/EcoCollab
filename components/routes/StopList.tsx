@@ -1,5 +1,4 @@
 // components/route/StopList.tsx
-import { BRAND } from '@/constants/Colors';
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -50,13 +49,6 @@ export const StopList = ({
       ) : (
         <Text style={{ opacity: 0.7 }}>Define um destino através do ecrã do ecoponto (botão “Ir para o local”).</Text>
       )}
-
-      <View style={styles.hint}>
-        <Ionicons name="information-circle-outline" size={16} color="#fff" />
-        <Text style={styles.hintTxt}>
-          Dica: usa “Adicionar paragem” para incluir ecopontos; podes remover aqui na lista.
-        </Text>
-      </View>
     </View>
   );
 };
@@ -81,17 +73,6 @@ const styles = StyleSheet.create({
   badgeTxt: { color:'#fff', fontWeight:'900', fontSize:12 },
   itemTitle: { fontWeight:'800' },
   itemSub: { fontSize:12, opacity:0.7 },
-
-  hint: {
-    marginTop: 6,
-    flexDirection:'row',
-    alignItems:'center',
-    gap:8,
-    backgroundColor: BRAND.primary,
-    borderRadius:10,
-    paddingHorizontal:10,
-    paddingVertical:8,
-  },
   hintTxt: { color:'#fff', fontWeight:'700', flex:1, fontSize:12 },
 
   trash: {
