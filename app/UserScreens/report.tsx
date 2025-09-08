@@ -29,6 +29,9 @@ import {
 } from '@/services/FirestoreService';
 import { CLOUDINARY_UPLOAD_PRESET, uploadToCloudinary } from '@/services/uploadCloudinary';
 
+// 🧠 IA
+import { useImageClassifier } from '@/hooks/useImageClassifier';
+
 const PROBLEMAS = [
   { value: 'cheio', label: 'Contentor cheio' },
   { value: 'partido', label: 'Contentor danificado' },
@@ -44,7 +47,11 @@ export default function Report() {
 
   const { user } = useAuth();
 
-  // Tema escuro fixo (como tinhas)
+  // 🧠 IA
+  const { loading: aiLoading, classify, last, error: aiError } = useImageClassifier();
+  const [aiAceite, setAiAceite] = useState(false);
+
+  // Tema escuro fixo
   const colors = THEME.dark;
   const bg = colors.bg;
   const text = colors.text;
@@ -71,9 +78,10 @@ export default function Report() {
   // Form state
   const [tipoProblema, setTipoProblema] = useState('cheio');
   const [descricao, setDescricao] = useState('');
-  const [imagens, setImagens] = useState<string[]>([]); // <— várias imagens
+  const [imagens, setImagens] = useState<string[]>([]); // várias imagens
   const [aEnviar, setAEnviar] = useState(false);
 
+  // Escolher imagem + classificar (IA)
   const escolherImagem = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
@@ -87,11 +95,20 @@ export default function Report() {
     if (!result.canceled && result.assets.length > 0) {
       const uri = result.assets[0].uri;
       setImagens((prev) => [...prev, uri]);
+
+      // 🧠 IA: reset e classificar a última imagem
+      setAiAceite(false);
+      try {
+        await classify(uri);
+      } catch {
+        // silencioso — o cartão mostrará erro se existir
+      }
     }
   };
 
   const removerImagem = (idx: number) => {
     setImagens((prev) => prev.filter((_, i) => i !== idx));
+    setAiAceite(false); // 🧠 IA: ao remover, remove a seleção da sugestão
   };
 
   const abrirNavegacao = () => {
@@ -144,8 +161,12 @@ export default function Report() {
         fotosUrl: fotosUrl,            // array completo
         criadoPor: user.uid,
         criadoPorDisplay: user.displayName ?? null,
-        status: 'aberto',
-      });
+        status: 'pendente',
+
+        // 🧠 IA: só grava se o utilizador aceitar a sugestão
+        aiSugestaoTipo: aiAceite && last?.suggested ? last.suggested.tipo : null,
+        aiConfidence:   aiAceite && last?.suggested ? last.suggested.confidence : null,
+      } as any);
 
       Alert.alert('Obrigado!', 'O teu reporte foi enviado com sucesso.');
       router.back();
@@ -220,15 +241,18 @@ export default function Report() {
             <TouchableOpacity
               style={[styles.uploadBtn, { backgroundColor: colors.bg, flex: 1 }]}
               onPress={escolherImagem}
+              disabled={aiLoading} // 🧠 IA: desativar enquanto analisa
             >
               <Ionicons name="image" size={20} color={colors.text} />
-              <Text style={[styles.uploadBtnText, { color: colors.text }]}>Adicionar imagem</Text>
+              <Text style={[styles.uploadBtnText, { color: colors.text }]}>
+                {aiLoading ? 'A analisar…' : 'Adicionar imagem'}
+              </Text>
             </TouchableOpacity>
 
             {imagens.length > 0 && (
               <TouchableOpacity
                 style={[styles.removeBtn, { backgroundColor: '#b00020' }]}
-                onPress={() => setImagens([])}
+                onPress={() => { setImagens([]); setAiAceite(false); }} // 🧠 IA: reset seleção
               >
                 <Ionicons name="trash" size={18} color="#fff" />
                 <Text style={styles.removeBtnText}>Remover todas</Text>
@@ -236,7 +260,7 @@ export default function Report() {
             )}
           </View>
 
-          {/* Pré‑visualização (com remover por item) */}
+          {/* Pré-visualização (com remover por item) */}
           {imagens.length > 0 && (
             <View style={styles.previewWrap}>
               {imagens.map((uri, idx) => (
@@ -251,6 +275,60 @@ export default function Report() {
                   </TouchableOpacity>
                 </View>
               ))}
+            </View>
+          )}
+
+          {/* 🧠 Cartão Sugestão de IA */}
+          {imagens.length > 0 && (
+            <View style={{
+              borderWidth: 1, borderColor: border, backgroundColor: '#EEEDD7',
+              padding: 12, borderRadius: 12, marginBottom: 12
+            }}>
+              <Text style={{ fontWeight: '800', color: '#222' }}>Sugestão de IA</Text>
+
+              {aiLoading && <Text style={{ color: '#333', marginTop: 4 }}>A analisar…</Text>}
+              {aiError &&  <Text style={{ color: '#a00',  marginTop: 4 }}>Falha na análise: {aiError}</Text>}
+
+              {!aiLoading && !aiError && last?.suggested && (
+                <>
+                  <Text style={{ color: '#333', marginTop: 6 }}>
+                    Parece ser: <Text style={{ fontWeight: '900', textTransform: 'uppercase' }}>
+                      {last.suggested.tipo}
+                    </Text> ({Math.round(last.suggested.confidence * 100)}%)
+                  </Text>
+
+                  <View style={{ flexDirection: 'row', gap: 12, marginTop: 10 }}>
+                    <TouchableOpacity
+                      onPress={() => setAiAceite(true)}
+                      style={{ backgroundColor: '#2e7d32', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10 }}
+                    >
+                      <Text style={{ color: '#fff', fontWeight: '700' }}>
+                        {aiAceite ? 'Sugestão escolhida' : 'Usar sugestão'}
+                      </Text>
+                    </TouchableOpacity>
+
+                    {aiAceite && (
+                      <TouchableOpacity
+                        onPress={() => setAiAceite(false)}
+                        style={{ backgroundColor: '#555', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10 }}
+                      >
+                        <Text style={{ color: '#fff', fontWeight: '700' }}>Cancelar</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+
+                  {!!last.raw?.length && (
+                    <View style={{ marginTop: 8 }}>
+                      <Text style={{ fontWeight: '700', fontSize: 12, color: '#333' }}>Top detecções:</Text>
+                      {last.raw.slice(0, 3).map((p: { label: string; prob: number }, i: number) => (
+                        <Text key={i} style={{ fontSize: 12, color: '#333' }}>
+                          • {p.label} ({Math.round(p.prob * 100)}%)
+                        </Text>
+                      ))}
+                    </View>
+                  )}
+                </>
+              )}
             </View>
           )}
 
