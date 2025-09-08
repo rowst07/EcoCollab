@@ -10,6 +10,7 @@ import {
   GeoPoint,
   getDoc,
   getDocs,
+  limit,
   onSnapshot,
   orderBy,
   query,
@@ -22,6 +23,16 @@ import {
 import { db } from '../firebase';
 
 export type Role = 'user' | 'moderator' | 'admin';
+
+/** 🔧 Util: remove chaves com undefined (Firestore não aceita undefined) */
+function pruneUndefined<T extends Record<string, any>>(obj: T): T {
+  const out: Record<string, any> = {};
+  for (const k of Object.keys(obj)) {
+    const v = (obj as any)[k];
+    if (v !== undefined) out[k] = v;
+  }
+  return out as T;
+}
 
 // ===================== USERS =====================
 
@@ -351,18 +362,31 @@ export function subscribePontosFavoritos(
 
 
 
+
 // ===================== REPORTES =====================
 
-export type ReporteStatus = 'pendente' | 'aprovado' | 'reprovado';
+// Alargado para cobrir os fluxos existentes/atuais
+export type ReporteStatus =
+  | 'pendente'
+  | 'em-analise'
+  | 'resolvido'
+  | 'aberto'       // retrocompat (se usado algures)
+  | 'aprovado'     // retrocompat
+  | 'reprovado';   // retrocompat
 
 export type ReporteCreate = {
   pontoId: string;                 // doc.id do pontoRecolha
   tipo: string;                    // 'cheio' | 'partido' | ...
   descricao: string;
   fotoUrl?: string | null;
+  fotosUrl?: string[];             // várias fotos (opcional)
   criadoPor: string;               // uid
   criadoPorDisplay?: string | null;
   status: ReporteStatus;           // 'pendente' na criação
+
+  // 🧠 IA (opcionais)
+  aiSugestaoTipo?: 'vidro' | 'papel' | 'plastico' | 'metal' | 'pilhas' | 'organico' | string | null;
+  aiConfidence?: number | null; // 0..1
 };
 
 export type ReporteDoc = ReporteCreate & {
@@ -375,11 +399,16 @@ const reportesCol = collection(db, 'reportes');
 
 /** Cria um reporte */
 export async function addReporte(data: ReporteCreate): Promise<string> {
-  const ref = await addDoc(reportesCol, {
+  const cleaned = pruneUndefined({
     ...data,
+    fotoUrl: data.fotoUrl ?? null,
+    fotosUrl: Array.isArray(data.fotosUrl) ? data.fotosUrl : [],
+    aiSugestaoTipo: data.aiSugestaoTipo ?? null,
+    aiConfidence: data.aiConfidence ?? null,
     dataCriacao: serverTimestamp(),
     dataAtualizacao: serverTimestamp(),
   });
+  const ref = await addDoc(reportesCol, cleaned);
   return ref.id;
 }
 
@@ -413,6 +442,40 @@ export function subscribeReportes(args: {
       onError?.(err);
     }
   );
+}
+
+/** 🔎 Lista para moderação com filtros úteis (IA) */
+export function subscribeReportesModeracao(
+  opts: {
+    statusIn?: ReporteStatus[];
+    onlyWithAI?: boolean;
+    minConfidence?: number; // 0..1
+    pageSize?: number;
+  },
+  cb: (rows: ReporteDoc[]) => void
+): Unsubscribe {
+  const clauses: any[] = [orderBy('dataCriacao', 'desc')];
+
+  // Where por status (máx 10)
+  if (opts.statusIn?.length) {
+    clauses.unshift(where('status', 'in', opts.statusIn));
+  }
+  // Where por existência de sugestão IA
+  if (opts.onlyWithAI) {
+    // Nota: '!= null' permite orderBy ('dataCriacao') em conjunto
+    clauses.unshift(where('aiSugestaoTipo', '!=', null));
+  }
+
+  const qRef = query(reportesCol, ...clauses, limit(opts.pageSize ?? 100));
+
+  return onSnapshot(qRef, (snap) => {
+    let rows: ReporteDoc[] = [];
+    snap.forEach((d) => rows.push({ id: d.id, ...(d.data() as any) } as ReporteDoc));
+    if (typeof opts.minConfidence === 'number') {
+      rows = rows.filter((r) => (r.aiConfidence ?? 0) >= (opts.minConfidence ?? 0));
+    }
+    cb(rows);
+  });
 }
 
 /** DETALHE do reporte em tempo real */
@@ -516,16 +579,6 @@ export type RetomaDoc = RetomaCreate & {
 
 const retomasCol = collection(db, 'retomas');
 
-/** Remove chaves com undefined (Firestore não aceita undefined) */
-function pruneUndefined<T extends Record<string, any>>(obj: T): T {
-  const copy: any = {};
-  Object.keys(obj).forEach((k) => {
-    const v = (obj as any)[k];
-    if (v !== undefined) copy[k] = v;
-  });
-  return copy;
-}
-
 /** Create */
 export async function addRetoma(data: RetomaCreate): Promise<string> {
   const cleaned = pruneUndefined({
@@ -599,10 +652,10 @@ export function subscribeRetomaById(
 // edita/atualiza apenas campos parciais permitidos pelas rules
 export async function updateRetomaPartial(id: string, data: Partial<RetomaDoc>) {
   const dref = doc(retomasCol, id);
-  const patch = {
+  const patch = pruneUndefined({
     ...data,
     dataAtualizacao: serverTimestamp(),
-  };
+  });
   await updateDoc(dref, patch as any);
 }
 

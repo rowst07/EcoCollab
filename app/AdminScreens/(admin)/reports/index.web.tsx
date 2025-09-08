@@ -2,30 +2,30 @@ import { db } from "@/firebase";
 import { useAuth } from "@/services/AuthContext";
 import { Link } from "expo-router";
 import {
-    collection,
-    doc,
-    DocumentSnapshot,
-    getDocs,
-    limit,
-    orderBy,
-    query,
-    startAfter,
-    updateDoc,
+  collection,
+  doc,
+  DocumentSnapshot,
+  getDocs,
+  limit,
+  orderBy,
+  query,
+  startAfter,
+  updateDoc,
 } from "firebase/firestore";
 import React, {
-    useCallback,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
 } from "react";
 import {
-    ActivityIndicator,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 
 /* ---------- Navbar ---------- */
@@ -75,11 +75,15 @@ type ReportRow = {
   criadoPor?: string;
   criadoPorDisplay?: string;
   dataCriacao?: any; // Timestamp | string | Date
+
+  // 🧠 IA
+  aiSugestaoTipo?: string | null;
+  aiConfidence?: number | null;
 };
 
 // ---- Settings ----
 const PAGE_SIZE = 25;
-type SortField = "dataCriacao" | "descricao" | "tipo" | "status" | "criadoPorDisplay";
+type SortField = "dataCriacao" | "descricao" | "tipo" | "status" | "criadoPorDisplay" | "aiConfidence";
 type SortDir = "asc" | "desc";
 
 /* ---------- UI helpers ---------- */
@@ -228,6 +232,10 @@ export default function Reports() {
   const [sortField, setSortField] = useState<SortField>("dataCriacao");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
+  // filtros IA
+  const [onlyWithAI, setOnlyWithAI] = useState<boolean>(false);
+  const [minConf, setMinConf] = useState<number>(0); // 0..1
+
   const mapDoc = (docSnap: any): ReportRow => {
     const d = docSnap.data() as any;
     return {
@@ -238,6 +246,8 @@ export default function Reports() {
       criadoPor: d?.criadoPor ?? "",
       criadoPorDisplay: d?.criadoPorDisplay ?? "",
       dataCriacao: d?.dataCriacao ?? null,
+      aiSugestaoTipo: d?.aiSugestaoTipo ?? null,
+      aiConfidence: d?.aiConfidence ?? null,
     };
   };
 
@@ -249,7 +259,7 @@ export default function Reports() {
     const tryOrderField = async (field: string) => {
       const qy = query(
         collection(db, "reportes"),
-        orderBy(field, sortDir),
+        orderBy(field as any, sortDir),
         limit(PAGE_SIZE)
       );
       const snap = await getDocs(qy);
@@ -285,7 +295,7 @@ export default function Reports() {
     const tryOrderField = async (field: string) => {
       const qy = query(
         collection(db, "reportes"),
-        orderBy(field, sortDir),
+        orderBy(field as any, sortDir),
         startAfter(lastDocRef.current as any),
         limit(PAGE_SIZE)
       );
@@ -323,18 +333,22 @@ export default function Reports() {
     [fetchNextPage]
   );
 
-  // filtros por data
+  // filtros por data + IA
   const filtered = useMemo(() => {
     const from = fromDate ? new Date(fromDate + "T00:00:00") : null;
     const to = toDate ? new Date(toDate + "T23:59:59") : null;
     return items.filter((r) => {
+      // datas
       const d = toDateOnly(r.dataCriacao);
       if (!d) return false;
       if (from && d < from) return false;
       if (to && d > to) return false;
+      // IA
+      if (onlyWithAI && !r.aiSugestaoTipo) return false;
+      if (minConf > 0 && (r.aiConfidence ?? 0) < minConf) return false;
       return true;
     });
-  }, [items, fromDate, toDate]);
+  }, [items, fromDate, toDate, onlyWithAI, minConf]);
 
   // KPIs
   const kpis = useMemo(() => {
@@ -359,10 +373,20 @@ export default function Reports() {
 
   // export
   const handleExport = useCallback(() => {
-    const rows: string[][] = [["ID","Descrição","Tipo","Status","Criado por","Criado por (display)","Data criação (ISO)"]];
+    const rows: string[][] = [["ID","Descrição","Tipo","Status","Criado por","Criado por (display)","IA tipo","IA confiança","Data criação (ISO)"]];
     filtered.forEach((r) => {
       const d = toDateOnly(r.dataCriacao);
-      rows.push([r.id, r.descricao ?? "", r.tipo ?? "", r.status ?? "", r.criadoPor ?? "", r.criadoPorDisplay ?? "", d ? d.toISOString() : ""]);
+      rows.push([
+        r.id,
+        r.descricao ?? "",
+        r.tipo ?? "",
+        r.status ?? "",
+        r.criadoPor ?? "",
+        r.criadoPorDisplay ?? "",
+        r.aiSugestaoTipo ?? "",
+        typeof r.aiConfidence === "number" ? String(Math.round(r.aiConfidence * 100)) + "%" : "",
+        d ? d.toISOString() : ""
+      ]);
     });
     downloadCSV(`ecocollab_reportes_${fromDate}_a_${toDate}.csv`, rows);
   }, [filtered, fromDate, toDate]);
@@ -425,6 +449,31 @@ export default function Reports() {
         <View style={styles.filtersRow}>
           <DateInput label="De" value={fromDate} onChange={setFromDate} />
           <DateInput label="Até" value={toDate} onChange={setToDate} />
+
+          {/* IA filters */}
+          <View style={{ gap: 6 }}>
+            <Text style={styles.label}>IA</Text>
+            <div style={{ display: "flex", gap: 8 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <input type="checkbox" checked={onlyWithAI} onChange={(e) => setOnlyWithAI(e.target.checked)} />
+                <span>Só com IA</span>
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span>Min conf:</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={minConf}
+                  onChange={(e) => setMinConf(parseFloat(e.target.value))}
+                  style={{ width: 140 }}
+                />
+                <span>{Math.round(minConf * 100)}%</span>
+              </label>
+            </div>
+          </View>
+
           <View style={{ marginLeft: 12, justifyContent: "flex-end" }}>
             <Text style={{ opacity: 0.7, fontSize: 12 }}>
               Ordenado por <Text style={{ fontWeight: "700" }}>{sortField}</Text> {sortDir === "asc" ? "↑" : "↓"}
@@ -463,7 +512,7 @@ export default function Reports() {
               <Text style={styles.thText}>Descrição {sortIcon("descricao")}</Text>
             </Pressable>
             <Pressable onPress={() => toggleSort("tipo")} style={[styles.thPress, { flex: 1 }]}>
-              <Text style={styles.thText}>Tipo {sortIcon("tipo")}</Text>
+              <Text style={styles.thText}>Tipo (user) {sortIcon("tipo")}</Text>
             </Pressable>
             <Pressable onPress={() => toggleSort("status")} style={[styles.thPress, { flex: 2 }]}>
               <Text style={styles.thText}>Status {sortIcon("status")}</Text>
@@ -474,12 +523,19 @@ export default function Reports() {
             <Pressable onPress={() => toggleSort("dataCriacao")} style={[styles.thPress, { flex: 2 }]}>
               <Text style={styles.thText}>Data {sortIcon("dataCriacao")}</Text>
             </Pressable>
+            {/* IA */}
+            <Pressable onPress={() => toggleSort("aiConfidence")} style={[styles.thPress, { flex: 2 }]}>
+              <Text style={styles.thText}>IA (tipo / conf.) {sortIcon("aiConfidence")}</Text>
+            </Pressable>
+            <View style={{ width: 40 }} />
           </View>
 
           {filtered.map((r) => {
             const d = toDateOnly(r.dataCriacao);
             const s = String(r.status ?? "").toLowerCase() as ReportStatus;
             const disable = busyId === r.id || !canEdit;
+            const discord = !!(r.aiSugestaoTipo && r.tipo && r.aiSugestaoTipo !== r.tipo);
+            const pct = Math.round(Math.max(0, Math.min(1, r.aiConfidence ?? 0)) * 100);
 
             return (
               <View key={r.id} style={styles.tableRow}>
@@ -487,7 +543,7 @@ export default function Reports() {
                 <Text style={[styles.td, { flex: 1 }]}>{r.tipo || "-"}</Text>
 
                 {/* STATUS com badge + select para alterar */}
-                <View style={[styles.td, { flex: 2, gap: 8 }]}>
+                <View style={[styles.td, { flex: 2, gap: 8, alignItems: "center", flexDirection: "row" }]}>
                   <View
                     style={[
                       styles.badge,
@@ -514,6 +570,28 @@ export default function Reports() {
 
                 <Text style={[styles.td, { flex: 2 }]}>{r.criadoPorDisplay || r.criadoPor || "-"}</Text>
                 <Text style={[styles.td, { flex: 2 }]}>{d ? d.toLocaleString() : "-"}</Text>
+
+                {/* IA col */}
+                <View style={[styles.td, { flex: 2, gap: 6 }]}>
+                  <View style={{ flexDirection: "row", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    <View style={[styles.badge, styles.badgeNeutral]}>
+                      <Text style={styles.badgeTxt}>IA: {r.aiSugestaoTipo ? String(r.aiSugestaoTipo).toUpperCase() : "—"}</Text>
+                    </View>
+                    {discord && (
+                      <View style={[styles.badge, styles.badgeDanger]}>
+                        <Text style={styles.badgeTxt}>DISCORDANTE</Text>
+                      </View>
+                    )}
+                  </View>
+                  {typeof r.aiConfidence === "number" && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ height: 8, background: "#e5e7eb", borderRadius: 8, overflow: "hidden", flex: 1 }}>
+                        <div style={{ width: `${pct}%`, height: "100%", background: "#1976D2" }} />
+                      </div>
+                      <span style={{ fontSize: 12, opacity: 0.8 }}>{pct}%</span>
+                    </div>
+                  )}
+                </View>
 
                 {/* ação opcional loading */}
                 {busyId === r.id && (

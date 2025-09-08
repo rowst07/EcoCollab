@@ -16,8 +16,14 @@ import {
   View
 } from 'react-native';
 
-type Estado = 'Pendente' | 'Aprovado' | 'Reprovado';
-type EstadoFiltro = 'Todos' | Estado;
+// --------- Estados (labels de UI) ---------
+// Core = os 3 usados no filtro
+type EstadoCore = 'Pendente' | 'Aprovado' | 'Reprovado';
+// Extras possíveis vindos do Firestore
+type EstadoExtra = 'Em análise' | 'Resolvido' | 'Aberto';
+type Estado = EstadoCore | EstadoExtra;
+
+type EstadoFiltro = 'Todos' | EstadoCore;
 type TipoMsg = 'reporte';
 
 type Item = {
@@ -28,28 +34,45 @@ type Item = {
   estado: Estado;
   data: string;
   fotoUrl?: string | null;
+
+  // 🧠 IA
+  aiTipo?: string | null;
+  aiConfidence?: number | null;
+  discordante?: boolean;
 };
 
-// Mapeamentos Firestore <-> UI
-const labelToFs: Record<Estado, ReporteStatus> = {
-  'Pendente': 'pendente',
-  'Aprovado': 'aprovado',
-  'Reprovado': 'reprovado',
+// Para filtrar, só precisamos mapear os 3 principais (tipado como ReporteStatus):
+const labelToFs: Record<EstadoCore, ReporteStatus> = {
+  Pendente: 'pendente',
+  Aprovado: 'aprovado',
+  Reprovado: 'reprovado',
 };
-const fsToLabel: Record<ReporteStatus, Estado> = {
-  'pendente': 'Pendente',
-  'aprovado': 'Aprovado',
-  'reprovado': 'Reprovado',
-};
+
+// Converte qualquer status vindo do Firestore para label de UI:
+function fsToLabel(status?: string): Estado {
+  switch ((status || '').toLowerCase()) {
+    case 'pendente':     return 'Pendente';
+    case 'aprovado':     return 'Aprovado';
+    case 'reprovado':    return 'Reprovado';
+    case 'em-analise':   return 'Em análise';
+    case 'resolvido':    return 'Resolvido';
+    case 'aberto':       return 'Aberto';
+    default:             return 'Pendente';
+  }
+}
 
 export default function MensagensModerador() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ estado?: 'Pendente' | 'Aprovado' | 'Reprovado' }>();
+  const params = useLocalSearchParams<{ estado?: EstadoCore }>();
 
   const [q, setQ] = useState('');
   const [estadoFiltro, setEstadoFiltro] = useState<EstadoFiltro>('Todos');
   const [items, setItems] = useState<Item[]>([]);
   const [busy, setBusy] = useState(true);
+
+  // filtros IA
+  const [onlyWithAI, setOnlyWithAI] = useState<boolean>(false);
+  const [minConf, setMinConf] = useState<number>(0); // 0..1
 
   // Aplica filtro inicial vindo por parâmetro (ex.: estado=Pendente)
   useEffect(() => {
@@ -58,21 +81,36 @@ export default function MensagensModerador() {
     }
   }, [params?.estado]);
 
-  // Subscrição aos reportes (respeita o filtro)
+  // Subscrição aos reportes (respeita o filtro de estado)
   useEffect(() => {
-    const statusIn = estadoFiltro === 'Todos' ? undefined : [labelToFs[estadoFiltro]];
+    let statusIn: ReporteStatus[] | undefined;
+    if (estadoFiltro !== 'Todos') {
+      // estreita o tipo: aqui estadoFiltro é EstadoCore
+      statusIn = [labelToFs[estadoFiltro]];
+    }
+
     const unsub = subscribeReportes({
       statusIn,
       onData: (rows) => {
-        const mapped: Item[] = rows.map((r) => ({
-          id: r.id,
-          tipo: 'reporte',
-          autor: r.criadoPorDisplay || 'Utilizador',
-          titulo: r.tipo ? r.tipo.charAt(0).toUpperCase() + r.tipo.slice(1) : 'Reporte',
-          estado: fsToLabel[r.status as ReporteStatus] ?? 'Pendente',
-          data: r.dataCriacao?.toDate ? r.dataCriacao.toDate().toLocaleDateString() : '',
-          fotoUrl: r.fotoUrl ?? undefined,
-        }));
+        const mapped: Item[] = rows.map((r) => {
+          const aiTipo = (r as any).aiSugestaoTipo ?? null;
+          const aiConfidence = (r as any).aiConfidence ?? null;
+          const userTipo = r.tipo ?? '';
+          const discordante = !!(aiTipo && userTipo && aiTipo !== userTipo);
+
+          return {
+            id: r.id,
+            tipo: 'reporte',
+            autor: r.criadoPorDisplay || 'Utilizador',
+            titulo: userTipo ? userTipo.charAt(0).toUpperCase() + userTipo.slice(1) : 'Reporte',
+            estado: fsToLabel(r.status),
+            data: r.dataCriacao?.toDate ? r.dataCriacao.toDate().toLocaleDateString() : '',
+            fotoUrl: r.fotoUrl ?? undefined,
+            aiTipo,
+            aiConfidence,
+            discordante,
+          };
+        });
         setItems(mapped);
         setBusy(false);
       },
@@ -82,16 +120,19 @@ export default function MensagensModerador() {
 
   const filtrados = useMemo(() => {
     const term = q.trim().toLowerCase();
-    if (!term) return items;
-    return items.filter(d =>
+    let base = items;
+    if (onlyWithAI) base = base.filter(i => i.aiTipo != null);
+    if (minConf > 0) base = base.filter(i => (i.aiConfidence ?? 0) >= minConf);
+    if (!term) return base;
+    return base.filter(d =>
       (d.autor + ' ' + d.titulo).toLowerCase().includes(term)
     );
-  }, [q, items]);
+  }, [q, items, onlyWithAI, minConf]);
 
   const EstadoChip = ({ value }: { value: Estado }) => {
     const st =
-      value === 'Aprovado' ? styles.chipDone :
-      value === 'Pendente' ? styles.chipProg :
+      value === 'Aprovado' || value === 'Resolvido' ? styles.chipDone :
+      value === 'Pendente' || value === 'Em análise' || value === 'Aberto' ? styles.chipProg :
       value === 'Reprovado' ? styles.chipIrrel :
       styles.chipNeutral;
     return <Text style={[styles.chip, st]}>{value}</Text>;
@@ -107,6 +148,18 @@ export default function MensagensModerador() {
       </Text>
     </TouchableOpacity>
   );
+
+  const ConfBar = ({ v }: { v?: number | null }) => {
+    const pct = Math.round(Math.max(0, Math.min(1, v ?? 0)) * 100);
+    return (
+      <View style={{ marginTop: 6 }}>
+        <View style={{ height: 8, backgroundColor: '#eee', borderRadius: 8, overflow: 'hidden' }}>
+          <View style={{ width: `${pct}%`, height: '100%' }} />
+        </View>
+        <Text style={{ fontSize: 12, color: '#616161', marginTop: 2 }}>{pct}%</Text>
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -145,6 +198,27 @@ export default function MensagensModerador() {
         )}
       </View>
 
+      {/* Filtros IA */}
+      <View style={[styles.filtersRow, { marginTop: 6 }]}>
+        <TouchableOpacity
+          onPress={() => setOnlyWithAI(v => !v)}
+          style={[styles.filter, onlyWithAI && styles.filterActiveAI]}
+        >
+          <Text style={[styles.filterTextAI, onlyWithAI && styles.filterTextAIActive]}>
+            {onlyWithAI ? 'Só com IA' : 'IA: todos'}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => setMinConf(c => (c >= 0.75 ? 0 : +(c + 0.25).toFixed(2)))}
+          style={[styles.filter, styles.filterMinConf]}
+        >
+          <Text style={[styles.filterTextAI]}>
+            Min conf: {Math.round(minConf * 100)}%
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Lista */}
       <FlatList
         contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 16 }}
@@ -169,7 +243,19 @@ export default function MensagensModerador() {
               </View>
             </View>
 
-            <Text style={styles.cardSub}>{item.titulo}</Text>
+            {/* Linha do tipo (user) + IA */}
+            <View style={{ gap: 4, marginBottom: 4 }}>
+              <Text style={styles.cardSub}>Tipo (utilizador): {item.titulo || '—'}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={[styles.cardSub, { fontWeight: '800' }]}>
+                  IA: {item.aiTipo ? String(item.aiTipo).toUpperCase() : '—'}
+                </Text>
+                {item.discordante && (
+                  <Text style={{ color: '#D32F2F', fontWeight: '900' }}>DISCORDANTE</Text>
+                )}
+              </View>
+              {typeof item.aiConfidence === 'number' && <ConfBar v={item.aiConfidence} />}
+            </View>
 
             <View style={styles.cardFooter}>
               <View style={styles.rowCenter}>
@@ -228,6 +314,12 @@ const styles = StyleSheet.create({
   filterText: { color: '#2E7D32', fontWeight: '700' },
   filterTextActive: { color: '#fff' },
 
+  // Filtros IA
+  filterActiveAI: { backgroundColor: '#1976D2' },
+  filterTextAI: { color: '#0F172A', fontWeight: '800' },
+  filterTextAIActive: { color: '#fff' },
+  filterMinConf: { backgroundColor: '#E3F2FD' },
+
   card: {
     backgroundColor: '#fff',
     borderRadius: 16,
@@ -248,8 +340,8 @@ const styles = StyleSheet.create({
   cardMeta: { marginLeft: 6, color: '#666' },
 
   chip: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 12, fontWeight: '800', color: '#fff', fontSize: 12 },
-  chipDone: { backgroundColor: '#2E7D32' },  // Aprovado
-  chipProg: { backgroundColor: '#FFA000' },  // Pendente
+  chipDone: { backgroundColor: '#2E7D32' },  // Aprovado / Resolvido
+  chipProg: { backgroundColor: '#FFA000' },  // Pendente / Em análise / Aberto
   chipIrrel: { backgroundColor: '#D32F2F' }, // Reprovado
   chipNeutral: { backgroundColor: '#9E9E9E' },
 });

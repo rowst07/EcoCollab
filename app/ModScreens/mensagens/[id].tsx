@@ -9,19 +9,31 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-// Estados (UI) e mapeamentos Firestore
-type Estado = 'Pendente' | 'Aprovado' | 'Reprovado';
+/* ========= Estados (UI) ========= */
+// Core usados nas ações/filtros
+type EstadoCore = 'Pendente' | 'Aprovado' | 'Reprovado';
+// Extras que podem existir no Firestore
+type EstadoExtra = 'Em análise' | 'Resolvido' | 'Aberto';
+type Estado = EstadoCore | EstadoExtra;
 
-const labelToFs: Record<Estado, ReporteStatus> = {
-  'Pendente': 'pendente',
-  'Aprovado': 'aprovado',
-  'Reprovado': 'reprovado',
-};
+/** Firestore -> UI label */
+function fsToLabel(status?: string): Estado {
+  switch ((status || '').toLowerCase()) {
+    case 'pendente':    return 'Pendente';
+    case 'aprovado':    return 'Aprovado';
+    case 'reprovado':   return 'Reprovado';
+    case 'em-analise':  return 'Em análise';
+    case 'resolvido':   return 'Resolvido';
+    case 'aberto':      return 'Aberto';
+    default:            return 'Pendente';
+  }
+}
 
-const fsToLabel: Record<ReporteStatus, Estado> = {
-  'pendente': 'Pendente',
-  'aprovado': 'Aprovado',
-  'reprovado': 'Reprovado',
+/** UI core -> Firestore (para ações de estado) */
+const labelToFs: Record<EstadoCore, ReporteStatus> = {
+  Pendente:  'pendente',
+  Aprovado:  'aprovado',
+  Reprovado: 'reprovado',
 };
 
 export default function MensagemDetalhe() {
@@ -42,21 +54,13 @@ export default function MensagemDetalhe() {
   useEffect(() => {
     if (!id) return;
     const unsub = subscribeReporteById(id, (r) => {
-      if (!r) {
-        setLoading(false);
-        return;
-      }
+      if (!r) { setLoading(false); return; }
       setTitulo(r.tipo ? r.tipo.charAt(0).toUpperCase() + r.tipo.slice(1) : 'Reporte');
       setDescricao(r.descricao || '');
       setAutor(r.criadoPorDisplay || 'Utilizador');
       setDataStr(r.dataCriacao?.toDate ? r.dataCriacao.toDate().toLocaleDateString() : '');
       setImagem(r.fotoUrl ?? undefined);
-      // mapear estado Firestore -> UI
-      if (r.status && (r.status in fsToLabel)) {
-        setEstado(fsToLabel[r.status as ReporteStatus]);
-      } else {
-        setEstado('Pendente'); // fallback
-      }
+      setEstado(fsToLabel(r.status));
       setPontoId(r.pontoId); // pode ser undefined
       setLoading(false);
     });
@@ -77,7 +81,13 @@ export default function MensagemDetalhe() {
     <Text
       style={[
         styles.chip,
-        v === 'Aprovado' ? styles.chipDone : v === 'Pendente' ? styles.chipProg : styles.chipIrrel,
+        v === 'Aprovado' || v === 'Resolvido'
+          ? styles.chipDone
+          : v === 'Pendente' || v === 'Em análise' || v === 'Aberto'
+          ? styles.chipProg
+          : v === 'Reprovado'
+          ? styles.chipIrrel
+          : styles.chipProg,
       ]}
     >
       {v}
@@ -90,7 +100,7 @@ export default function MensagemDetalhe() {
       { text: 'Confirmar', style: 'destructive', onPress: onOk },
     ]);
 
-  // Ações — gravam no Firestore
+  // Ações — gravam no Firestore (usamos apenas estados core)
   const marcarPendente = () =>
     confirm('Marcar como pendente?', async () => {
       await updateReporteStatus(String(id), labelToFs['Pendente']);
@@ -113,8 +123,12 @@ export default function MensagemDetalhe() {
     });
 
   const guardarAlteracoes = async () => {
-    await updateReporteStatus(String(id), labelToFs[estado]);
-    Alert.alert('Guardado', `Estado atualizado para "${estado}".`);
+    // Se o estado atual for um extra (ex.: "Em análise"), faz fallback para 'Pendente'
+    const core: EstadoCore =
+      estado === 'Aprovado' || estado === 'Reprovado' ? estado : 'Pendente';
+    await updateReporteStatus(String(id), labelToFs[core]);
+    setEstado(core);
+    Alert.alert('Guardado', `Estado atualizado para "${core}".`);
   };
 
   if (loading) {
@@ -209,8 +223,8 @@ const styles = StyleSheet.create({
   green: { backgroundColor: '#2E7D32' },
 
   chip: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 12, fontWeight: '800', color: '#fff', fontSize: 12 },
-  chipDone: { backgroundColor: '#2E7D32' },  // Aprovado
-  chipProg: { backgroundColor: '#FFA000' },  // Pendente
+  chipDone: { backgroundColor: '#2E7D32' },  // Aprovado / Resolvido
+  chipProg: { backgroundColor: '#FFA000' },  // Pendente / Em análise / Aberto
   chipIrrel: { backgroundColor: '#D32F2F' }, // Reprovado
 
   btnGhost: { flex: 1, borderRadius: 12, borderWidth: 1, borderColor: '#DDD', alignItems: 'center', justifyContent: 'center', paddingVertical: 12 },
