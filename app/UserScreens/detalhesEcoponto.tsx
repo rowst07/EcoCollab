@@ -274,7 +274,7 @@ export default function DetalhesEcoponto() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: BRAND.secondary }]}
+              style={[styles.actionBtn, { backgroundColor: BRAND.accent }]}
               onPress={adicionarComoParagem}
               disabled={eco.latitude == null || eco.longitude == null}
             >
