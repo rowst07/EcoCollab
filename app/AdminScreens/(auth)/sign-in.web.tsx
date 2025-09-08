@@ -1,25 +1,26 @@
-import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 import { useAuth } from "../../../services/AuthContext";
 
 export default function SignInWeb() {
-  const { user, loading, signIn } = useAuth();
+  const { loading, signIn } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [subm, setSubm] = useState(false);
 
-  useEffect(() => {
-    if (user) router.replace("/AdminScreens" as any);
-  }, [user]);
-
-  if (loading) return <View style={{ padding: 16 }}><Text>A carregar…</Text></View>;
+  if (loading) {
+    return (
+      <View style={{ padding: 16 }}>
+        <Text>A carregar…</Text>
+      </View>
+    );
+  }
 
   return (
     <View
       style={{
-        minHeight: "100vh" as any, // web only
+        minHeight: "100vh" as any,
         alignItems: "center",
         justifyContent: "center",
         padding: 16,
@@ -66,13 +67,19 @@ export default function SignInWeb() {
           disabled={subm}
           onPress={async () => {
             setErr(null); setSubm(true);
-            try { await signIn(email.trim(), password); }
-            catch (e: any) {
+            try {
+              await signIn(email.trim(), password);
+              // ✅ Sem router.replace aqui. O _layout redireciona após login.
+            } catch (e: any) {
               const code = e?.code || "";
-              if (code.includes("invalid-credential") || code.includes("wrong-password")) setErr("Email ou palavra-passe inválidos.");
-              else if (code.includes("user-not-found")) setErr("Utilizador não encontrado.");
+              if (code.includes("invalid-credential") || code.includes("wrong-password"))
+                setErr("Email ou palavra-passe inválidos.");
+              else if (code.includes("user-not-found"))
+                setErr("Utilizador não encontrado.");
               else setErr("Não foi possível iniciar sessão.");
-            } finally { setSubm(false); }
+            } finally {
+              setSubm(false);
+            }
           }}
         >
           <Text style={{ color: "#fff", fontWeight: "700" }}>{subm ? "A entrar…" : "Entrar"}</Text>

@@ -1,4 +1,10 @@
-// app/UserScreens/planeadorRota.tsx
+import MapView, {
+  Callout,
+  Marker,
+  Polyline,
+  PROVIDER_GOOGLE,
+  type MapViewRef, // 👈 importa o tipo do wrapper
+} from '@/components/MapView';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -13,7 +19,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import MapView, { Callout, Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 
 import { BRAND, THEME } from '@/constants/Colors';
 import { MAP_STYLE_DARK } from '@/constants/Map';
@@ -191,7 +196,7 @@ export default function PlaneadorRota() {
   const border = useThemeColor('border');
   const card = useThemeColor('card');
 
-  const mapRef = useRef<MapView>(null);
+  const mapRef = useRef<MapViewRef>(null); // 👈 ref tipado pelo wrapper
   const [pickerOpen, setPickerOpen] = useState(false);
   const [bottomH, setBottomH] = useState(0);
   const [currentLatDelta, setCurrentLatDelta] = useState<number | undefined>(undefined);

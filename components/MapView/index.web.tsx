@@ -1,4 +1,6 @@
-import React from "react";
+// components/MapView/index.web.tsx
+import * as React from "react";
+import type { MapViewProps, MapViewRef } from "./index.d";
 
 export const Marker   = (_: any) => null;
 export const Callout  = (_: any) => null;
@@ -7,7 +9,12 @@ export const Polygon  = (_: any) => null;
 export const Polyline = (_: any) => null;
 export const PROVIDER_GOOGLE = "google";
 
-type Props = { style?: React.CSSProperties; children?: React.ReactNode };
-export default function MapViewStub(_props: Props) {
-  return null; // opcional: <div>Mapa indisponível no web</div>
-}
+const MapView = React.forwardRef<MapViewRef, MapViewProps>((_props, ref) => {
+  React.useImperativeHandle(ref, () => ({
+    animateToRegion: () => { /* no-op no web */ },
+  }), []);
+  // Não renderizamos nada no web (evita importar módulos nativos)
+  return null;
+});
+
+export default MapView;

@@ -1,22 +1,22 @@
 import { useAuth } from '@/services/AuthContext';
-import { useRouter } from 'expo-router';
+import { router } from 'expo-router';
 import { useCallback } from 'react';
 import { ActivityIndicator, Dimensions, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 export default function Welcome() {
-  const router = useRouter();
-  const {user, loading} = useAuth();
+  const { user, loading } = useAuth();
   const { height } = Dimensions.get('window');
 
   const handleStart = useCallback(() => {
     if (loading) return;
 
     if (user) {
-      router.replace('../UserScreens/homeUser');
+      // ✅ usa rota absoluta e push (sem replace) — evita ping-pong
+      router.push('/UserScreens/homeUser' as any);
     } else {
-      router.push('/SharedScreens/login');
+      router.push('/SharedScreens/login' as any);
     }
-  }, [loading, user, router]);
+  }, [loading, user]);
 
   return (
     <View style={styles.wrapper}>
@@ -24,7 +24,7 @@ export default function Welcome() {
       <View style={[styles.header, { height: height * 0.33 }]}>
         <View style={styles.logoGroup}>
           <Image
-            source={require('../../assets/logo.png')} // substitui pelo teu logo real
+            source={require('../../assets/logo.png')}
             style={styles.logo}
           />
           <Text style={styles.logoText}>EcoCollab</Text>
@@ -38,7 +38,7 @@ export default function Welcome() {
           A sua solução ideal para o ajudar e incentivar a tornar este mundo um lugar melhor.
         </Text>
 
-        <TouchableOpacity style={styles.button} onPress={handleStart}>
+        <TouchableOpacity style={styles.button} onPress={handleStart} disabled={loading}>
           {loading ? <ActivityIndicator /> : <Text style={styles.buttonText}>Iniciar</Text>}
         </TouchableOpacity>
       </View>
